@@ -158,24 +158,26 @@ function drawWardrobeBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop:
 }
 
 function drawWardrobeOverlays(ctx: CanvasRenderingContext2D, template: TemplateSettings, layout: Layout) {
+  const captionPosition = template.studioCaptionPosition || { x: .73, y: .055 };
+  const pricePosition = template.studioPricePosition || { x: .78, y: .89 };
   drawWardrobeLabel(ctx, template.studioCaption?.trim() || '', {
     textColor: template.studioCaptionTextColor || '#111827', backgroundColor: template.studioCaptionBackgroundColor || '',
-    top: layout.height * .045, right: layout.width * .045, maxWidth: layout.width * .62, fontSize: layout.width > layout.height ? 34 : 40,
+    centerX: layout.width * captionPosition.x, top: layout.height * captionPosition.y, maxWidth: layout.width * .62, fontSize: layout.width > layout.height ? 34 : 40,
   }, layout);
   drawWardrobeLabel(ctx, template.studioPrice?.trim() || '', {
     textColor: template.studioPriceTextColor || '#111827', backgroundColor: template.studioPriceBackgroundColor || '',
-    top: layout.height * .89, right: layout.width * .045, maxWidth: layout.width * .38, fontSize: layout.width > layout.height ? 38 : 48,
+    centerX: layout.width * pricePosition.x, top: layout.height * pricePosition.y, maxWidth: layout.width * .38, fontSize: layout.width > layout.height ? 38 : 48,
   }, layout);
 }
 
-function drawWardrobeLabel(ctx: CanvasRenderingContext2D, value: string, options: { textColor: string; backgroundColor: string; top: number; right: number; maxWidth: number; fontSize: number }, layout: Layout) {
+function drawWardrobeLabel(ctx: CanvasRenderingContext2D, value: string, options: { textColor: string; backgroundColor: string; centerX: number; top: number; maxWidth: number; fontSize: number }, layout: Layout) {
   if (!value) return;
   ctx.save(); ctx.font = layout.font(900, options.fontSize);
   const text = truncateToWidth(ctx, value, options.maxWidth - layout.width * .05);
   const paddingX = layout.width * .022; const paddingY = layout.width * .012;
   const width = Math.min(options.maxWidth, ctx.measureText(text).width + paddingX * 2);
   const height = Math.round(options.fontSize * layout.scale * 1.42 + paddingY * 2);
-  const x = layout.width - options.right - width;
+  const x = Math.max(layout.width * .02, Math.min(layout.width - width - layout.width * .02, options.centerX - width / 2));
   if (options.backgroundColor && options.backgroundColor !== 'transparent') {
     ctx.fillStyle = options.backgroundColor; roundedRect(ctx, x, options.top, width, height, Math.min(height / 2, layout.width * .035)); ctx.fill();
   }

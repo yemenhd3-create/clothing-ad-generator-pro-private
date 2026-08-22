@@ -200,6 +200,8 @@ export type TemplateVisualTheme = 'classic' | 'midnight' | 'rose' | 'mint' | 'sa
 export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight';
 /** ظل هندسي محلي يوضع أسفل المنتج الشفاف داخل مساحة البطل. */
 export type ProductShadowPreset = 'none' | 'soft' | 'grounded';
+/** موضع نسبي داخل قالب غرفة الملابس لطبقة نص اختيارية. */
+export interface StudioOverlayPosition { x: number; y: number; }
 export type ArtworkLayerKey = 'header' | 'footer' | 'logo';
 export type ArtworkFitMode = 'contain' | 'cover' | 'stretch';
 
@@ -254,10 +256,12 @@ export interface TemplateSettings {
   studioCaptionTextColor?: string;
   /** اتركها فارغة أو transparent لعرض النص من دون شارة خلفية. */
   studioCaptionBackgroundColor?: string;
+  studioCaptionPosition?: StudioOverlayPosition;
   /** سعر اختياري في أسفل قالب غرفة الملابس؛ لا يعتمد على بيانات الإعلان القديمة. */
   studioPrice?: string;
   studioPriceTextColor?: string;
   studioPriceBackgroundColor?: string;
+  studioPricePosition?: StudioOverlayPosition;
   /** وضع غرفة الملابس: يرسم المنتج المفصول داخل خلفية كاملة بلا بيانات أو شارات أو طبقات إعلان. */
   wardrobeStudio?: boolean;
 }
@@ -506,9 +510,11 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   studioCaption: '',
   studioCaptionTextColor: '#111827',
   studioCaptionBackgroundColor: '',
+  studioCaptionPosition: { x: .73, y: .055 },
   studioPrice: '',
   studioPriceTextColor: '#111827',
   studioPriceBackgroundColor: '',
+  studioPricePosition: { x: .78, y: .89 },
 };
 
 export const DISCOUNT_BADGE_COLOR = '#C41A1A';

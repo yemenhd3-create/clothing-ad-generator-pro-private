@@ -27,6 +27,8 @@ export type LocalRemovalTiming = {
 
 export type LocalBackgroundRemovalResult = {
   imageUrl: string;
+  width: number;
+  height: number;
   modelSizeBytes: number;
   timing: LocalRemovalTiming;
 };
@@ -109,6 +111,8 @@ export async function removeBackgroundLocally(sourceUrl: string, onStage?: (stag
   const finishingMs = now() - finishingStartedAt;
   return {
     imageUrl: URL.createObjectURL(blob),
+    width: outputCanvas.width,
+    height: outputCanvas.height,
     modelSizeBytes: LOCAL_BACKGROUND_MODEL_SIZE_BYTES,
     timing: {
       sessionMs: Math.round(sessionMs),

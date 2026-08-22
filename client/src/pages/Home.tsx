@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import type { AdDetails, AdWorkflowStep, DesignSuggestion, TemplateSettings, TemplateSize, TryOnResult } from '@shared/types';
+import type { AdDetails, AdWorkflowStep, DesignSuggestion, StudioOverlayPosition, TemplateSettings, TemplateSize, TryOnResult } from '@shared/types';
 import {
   DEFAULT_AD_DETAILS,
   DEFAULT_PRODUCT_SCALE,
@@ -59,6 +59,10 @@ import {
   SlidersHorizontal,
   Sparkles,
   Bot,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Wand2,
 } from 'lucide-react';
 
@@ -491,20 +495,21 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     }
 
     try {
+      const fullHeightSubject = shouldPreserveFullHeight(localImage);
       setTryOnResult({
         status: 'success',
         imageUrl: localImage.imageUrl,
         providerId: 'local-u2netp',
         message: `تمت إزالة الخلفية محلياً خلال ${formatLocalDuration(localImage.timing.totalMs)}. لم تُرسل الصورة إلى أي خدمة خارجية.`,
         isTransparent: true,
-        transparentSubject: 'garment',
+        transparentSubject: fullHeightSubject ? 'person' : 'garment',
       });
       const renderTemplate = WARDROBE_ROOM_MODE ? createWardrobeTemplate(templateSettings) : templateSettings;
       const renderDetails = WARDROBE_ROOM_MODE ? createWardrobeDetails() : adDetails;
       const dimensions = getCanvasDimensions(renderTemplate.size);
       setLastVisualSource(localImage.imageUrl);
       const output = await withTimeout(
-        renderAd(renderDetails, renderTemplate, localImage.imageUrl, { ...dimensions, visualMode: 'garment', garmentTransform: renderTemplate.smartGarmentTransform }),
+        renderAd(renderDetails, renderTemplate, localImage.imageUrl, { ...dimensions, visualMode: fullHeightSubject ? 'transparentPerson' : 'garment', garmentTransform: renderTemplate.smartGarmentTransform }),
         15_000,
         'انتهت مهلة إنشاء الإعلان. جرّب صورة أصغر أو أعد المحاولة.'
       );
@@ -1158,9 +1163,9 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         )}
 
         {activeView === 'create' && currentStep === 'final' && (
-          <section className="space-y-5">
-            <div className="reference-card p-5 sm:p-7">
-              <div className="mb-5 flex items-start justify-between gap-3">
+          <section className={WARDROBE_ROOM_MODE ? '' : 'space-y-5'}>
+            <div className={`reference-card ${WARDROBE_ROOM_MODE ? 'p-3' : 'p-5 sm:p-7'}`} style={WARDROBE_ROOM_MODE ? { height: 'calc(100svh - 7.5rem)' } : undefined}>
+              {!WARDROBE_ROOM_MODE && <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><BadgeCheck size={15} /> {WARDROBE_ROOM_MODE ? 'صورة الاستديو جاهزة' : 'الإعلان جاهز'}</span>
                   <h2 className="mt-3 text-2xl font-black text-primary">{WARDROBE_ROOM_MODE ? 'قطعة الملابس جاهزة للعرض' : 'إعلانك أصبح جاهزاً'}</h2>
@@ -1173,7 +1178,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   >
                     <Pencil size={16} /> تعديل
                   </button></div>
-              </div>
+              </div>}
 
               {isGenerating && (
                 <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl bg-secondary/70 p-8 text-center">
@@ -1185,14 +1190,27 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 </div>
               )}
 
-              {!isGenerating && generatedAd && (
+              {!isGenerating && generatedAd && WARDROBE_ROOM_MODE && (
+                <div className="flex h-full min-h-0 flex-col" aria-label="مساحة عمل غرفة الملابس">
+                  <div className="sticky top-0 z-20 shrink-0 bg-white pb-3">
+                    <div className="flex items-center justify-between gap-2 px-1 pb-3"><h2 className="text-sm font-black text-primary">غرفة الملابس</h2><span className="text-xs font-bold text-muted-foreground">القالب ثابت أثناء التعديل</span></div>
+                    <img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto w-full rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: '42svh' }} />
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-3" aria-label="أدوات تعديل غرفة الملابس">
+                    <StudioAppearanceControls settings={templateSettings} disabled={isGenerating} onChange={handleStudioAppearanceChange} />
+                    <ProductScaleControl scale={clampProductScale(templateSettings.productScale)} disabled={isGenerating} onCommit={handleProductScaleCommit} />
+                    <section className="mt-3 grid grid-cols-2 gap-3"><button type="button" onClick={handleDownload} className="reference-primary w-full"><Send size={18} />تنزيل</button><button type="button" onClick={() => void handleShare()} className="reference-outline w-full"><MessageCircle size={18} />مشاركة</button></section>
+                  </div>
+                </div>
+              )}
+
+              {!isGenerating && generatedAd && !WARDROBE_ROOM_MODE && (
                 <>
                   <img
                     src={generatedAd}
                     alt="معاينة الإعلان النهائي"
                     className="mx-auto max-h-[560px] w-full rounded-3xl border border-stone-100 bg-stone-50 object-contain shadow-sm"
                   />
-                  {WARDROBE_ROOM_MODE && <StudioAppearanceControls settings={templateSettings} disabled={isGenerating} onChange={handleStudioAppearanceChange} />}
                   <ProductScaleControl scale={clampProductScale(templateSettings.productScale)} disabled={isGenerating} onCommit={handleProductScaleCommit} />
                   {!WARDROBE_ROOM_MODE && <React.Suspense fallback={null}><TryOnStatusNotice result={tryOnResult} /></React.Suspense>}
                 </>
@@ -1205,10 +1223,6 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 </div>
               )}
             </div>
-
-            {!isGenerating && generatedAd && WARDROBE_ROOM_MODE && (
-              <section className="grid grid-cols-2 gap-3"><button type="button" onClick={handleDownload} className="reference-primary w-full"><Send size={18} />تنزيل الصورة</button><button type="button" onClick={() => void handleShare()} className="reference-outline w-full"><MessageCircle size={18} />مشاركة</button></section>
-            )}
 
             {!isGenerating && generatedAd && !WARDROBE_ROOM_MODE && (
               <>
@@ -1259,29 +1273,45 @@ function ProductScaleControl({ scale, disabled, onCommit }: { scale: number; dis
   </section>;
 }
 
-function StudioAppearanceControls({ settings, disabled, onChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: Pick<TemplateSettings, 'productBackdrop' | 'productShadow'>) => void }) {
+type StudioAppearancePatch = Partial<Pick<TemplateSettings, 'productBackdrop' | 'productShadow' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioCaptionPosition' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor' | 'studioPricePosition'>>;
+
+function StudioAppearanceControls({ settings, disabled, onChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void }) {
   const backdrops: Array<{ id: NonNullable<TemplateSettings['productBackdrop']>; label: string }> = [
     { id: 'soft', label: 'نظيف' }, { id: 'warm', label: 'دافئ' }, { id: 'cool', label: 'بارد' }, { id: 'spotlight', label: 'إضاءة' },
   ];
   const shadows: Array<{ id: NonNullable<TemplateSettings['productShadow']>; label: string }> = [
     { id: 'none', label: 'بلا ظل' }, { id: 'soft', label: 'ناعم' }, { id: 'grounded', label: 'أرضي' },
   ];
-  const update = (patch: Partial<Pick<TemplateSettings, 'productBackdrop' | 'productShadow' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor'>>) => onChange(patch);
+  const update = (patch: StudioAppearancePatch) => onChange(patch);
   return <section className="mt-4 rounded-2xl border border-primary/10 bg-secondary/[0.18] p-4" aria-label="ضبط غرفة الملابس">
     <div className="flex items-center gap-2 text-primary"><Palette size={18} /><h3 className="text-sm font-black">غرفة الملابس</h3></div>
     <p className="mt-1 text-xs leading-5 text-muted-foreground">الخلفية تغيّر القالب كاملاً، والظل يوضع أسفل القطعة المفرغة محلياً.</p>
     <div className="mt-3"><span className="text-xs font-black text-primary">خلفية القالب كاملة</span><div className="mt-2 grid grid-cols-4 gap-2">{backdrops.map(backdrop => <button key={backdrop.id} type="button" disabled={disabled} aria-pressed={(settings.productBackdrop || 'auto') === backdrop.id} onClick={() => update({ productBackdrop: backdrop.id })} className={`rounded-xl px-2 py-2 text-xs font-black transition active:scale-95 disabled:opacity-50 ${(settings.productBackdrop || 'auto') === backdrop.id ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{backdrop.label}</button>)}</div></div>
     <div className="mt-3"><span className="text-xs font-black text-primary">الظل تحت المنتج</span><div className="mt-2 grid grid-cols-3 gap-2">{shadows.map(shadow => <button key={shadow.id} type="button" disabled={disabled} aria-pressed={(settings.productShadow || 'soft') === shadow.id} onClick={() => update({ productShadow: shadow.id })} className={`rounded-xl px-2 py-2 text-xs font-black transition active:scale-95 disabled:opacity-50 ${(settings.productShadow || 'soft') === shadow.id ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{shadow.label}</button>)}</div></div>
-    <StudioTextControls settings={settings} disabled={disabled} onChange={update} />
+    <StudioOverlayEditor settings={settings} disabled={disabled} onChange={update} />
   </section>;
 }
 
-function StudioTextControls({ settings, disabled, onChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: Partial<Pick<TemplateSettings, 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor'>>) => void }) {
-  const hasCaptionBackground = Boolean(settings.studioCaptionBackgroundColor);
-  const hasPriceBackground = Boolean(settings.studioPriceBackgroundColor);
-  return <div className="mt-4 border-t border-primary/10 pt-4"><span className="text-xs font-black text-primary">نص وسعر اختياريان</span><p className="mt-1 text-xs text-muted-foreground">اترك الحقول فارغة ليبقى القالب نظيفاً.</p><label className="mt-3 block text-xs font-bold text-primary">النص<input value={settings.studioCaption || ''} disabled={disabled} maxLength={80} onChange={event => onChange({ studioCaption: event.target.value })} placeholder="مثال: متوفر لدى مركز السعر المناسب" className="mt-2 min-h-11 w-full rounded-xl border border-primary/10 bg-white px-3 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50" /></label><div className="mt-2 grid grid-cols-2 gap-2"><ColorControl label="لون النص" value={settings.studioCaptionTextColor || '#111827'} disabled={disabled} onChange={studioCaptionTextColor => onChange({ studioCaptionTextColor })} /><BackgroundToggle active={hasCaptionBackground} label="خلفية النص" disabled={disabled} onToggle={() => onChange({ studioCaptionBackgroundColor: hasCaptionBackground ? '' : '#ff5757' })} /></div>{hasCaptionBackground && <ColorControl label="لون الخلفية" value={settings.studioCaptionBackgroundColor || '#ff5757'} disabled={disabled} onChange={studioCaptionBackgroundColor => onChange({ studioCaptionBackgroundColor })} />}
-    <label className="mt-4 block text-xs font-bold text-primary">السعر<input value={settings.studioPrice || ''} disabled={disabled} maxLength={32} onChange={event => onChange({ studioPrice: event.target.value })} placeholder="مثال: السعر 500" className="mt-2 min-h-11 w-full rounded-xl border border-primary/10 bg-white px-3 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50" /></label><div className="mt-2 grid grid-cols-2 gap-2"><ColorControl label="لون السعر" value={settings.studioPriceTextColor || '#111827'} disabled={disabled} onChange={studioPriceTextColor => onChange({ studioPriceTextColor })} /><BackgroundToggle active={hasPriceBackground} label="خلفية السعر" disabled={disabled} onToggle={() => onChange({ studioPriceBackgroundColor: hasPriceBackground ? '' : '#ffe600' })} /></div>{hasPriceBackground && <ColorControl label="لون الخلفية" value={settings.studioPriceBackgroundColor || '#ffe600'} disabled={disabled} onChange={studioPriceBackgroundColor => onChange({ studioPriceBackgroundColor })} />}</div>;
+function StudioOverlayEditor({ settings, disabled, onChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void }) {
+  const [open, setOpen] = useState(false);
+  const [layer, setLayer] = useState<'caption' | 'price'>('caption');
+  const isCaption = layer === 'caption';
+  const value = isCaption ? settings.studioCaption || '' : settings.studioPrice || '';
+  const textColor = isCaption ? settings.studioCaptionTextColor || '#111827' : settings.studioPriceTextColor || '#111827';
+  const backgroundColor = isCaption ? settings.studioCaptionBackgroundColor || '' : settings.studioPriceBackgroundColor || '';
+  const position = isCaption ? settings.studioCaptionPosition || { x: .73, y: .055 } : settings.studioPricePosition || { x: .78, y: .89 };
+  const updatePosition = (dx: number, dy: number) => {
+    const next: StudioOverlayPosition = { x: Number(Math.min(.86, Math.max(.14, position.x + dx)).toFixed(2)), y: Number(Math.min(.9, Math.max(.04, position.y + dy)).toFixed(2)) };
+    onChange(isCaption ? { studioCaptionPosition: next } : { studioPricePosition: next });
+  };
+  const updateValue = (next: string) => onChange(isCaption ? { studioCaption: next } : { studioPrice: next });
+  const updateTextColor = (next: string) => onChange(isCaption ? { studioCaptionTextColor: next } : { studioPriceTextColor: next });
+  const updateBackgroundColor = (next: string) => onChange(isCaption ? { studioCaptionBackgroundColor: next } : { studioPriceBackgroundColor: next });
+  const toggleBackground = () => updateBackgroundColor(backgroundColor ? '' : isCaption ? '#ff5757' : '#ffe600');
+  return <div className="mt-4 border-t border-primary/10 pt-4"><button type="button" disabled={disabled} aria-expanded={open} onClick={() => setOpen(current => !current)} className="flex min-h-11 w-full items-center justify-between rounded-xl bg-white px-3 text-sm font-black text-primary shadow-sm disabled:opacity-50"><span className="flex items-center gap-2"><Pencil size={17} />نص وسعر</span><span className="text-xs">{open ? 'إغلاق' : 'إضافة أو تحريك'}</span></button>{open && <div className="mt-3 rounded-xl bg-white p-3 shadow-sm"><div className="flex items-center justify-between gap-2"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLayer('caption')} className={`rounded-lg px-3 py-2 text-xs font-black ${isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>النص</button><button type="button" onClick={() => setLayer('price')} className={`rounded-lg px-3 py-2 text-xs font-black ${!isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>السعر</button></div><button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-xs font-black text-primary">تم</button></div><label className="mt-3 block text-xs font-bold text-primary">{isCaption ? 'اكتب النص' : 'اكتب السعر'}<input value={value} disabled={disabled} maxLength={isCaption ? 80 : 32} onChange={event => updateValue(event.target.value)} placeholder={isCaption ? 'متوفر لدى مركز السعر المناسب' : 'السعر 500'} className="mt-2 min-h-11 w-full rounded-xl border border-primary/10 px-3 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50" /></label><div className="mt-2 grid grid-cols-2 gap-2"><ColorControl label="لون الخط" value={textColor} disabled={disabled} onChange={updateTextColor} /><BackgroundToggle active={Boolean(backgroundColor)} label="خلفية" disabled={disabled} onToggle={toggleBackground} /></div>{backgroundColor && <ColorControl label="لون الخلفية" value={backgroundColor} disabled={disabled} onChange={updateBackgroundColor} />}<div className="mt-3 border-t border-primary/10 pt-3"><p className="text-xs font-black text-primary">حرّك داخل الصورة</p><div className="mx-auto mt-2 grid grid-cols-3 gap-2" style={{ width: 144 }}><span /><MoveButton label="أعلى" disabled={disabled} onClick={() => updatePosition(0, -.04)}><ArrowUp size={16} /></MoveButton><span /><MoveButton label="يمين" disabled={disabled} onClick={() => updatePosition(.04, 0)}><ArrowRight size={16} /></MoveButton><span className="flex items-center justify-center text-xs font-bold text-muted-foreground">حرّك</span><MoveButton label="يسار" disabled={disabled} onClick={() => updatePosition(-.04, 0)}><ArrowLeft size={16} /></MoveButton><span /><MoveButton label="أسفل" disabled={disabled} onClick={() => updatePosition(0, .04)}><ArrowDown size={16} /></MoveButton><span /></div></div></div>}</div>;
 }
+
+function MoveButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className="flex h-9 items-center justify-center rounded-lg bg-secondary text-primary disabled:opacity-50">{children}</button>; }
 
 function ColorControl({ label, value, disabled, onChange }: { label: string; value: string; disabled: boolean; onChange: (value: string) => void }) { return <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-primary">{label}<input type="color" value={value} disabled={disabled} onChange={event => onChange(event.target.value)} className="h-7 w-9 cursor-pointer border-0 bg-transparent p-0 disabled:cursor-not-allowed" /></label>; }
 function BackgroundToggle({ active, label, disabled, onToggle }: { active: boolean; label: string; disabled: boolean; onToggle: () => void }) { return <button type="button" disabled={disabled} onClick={onToggle} className={`rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50 ${active ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{label}: {active ? 'مفعّلة' : 'بدون'}</button>; }
@@ -1326,6 +1356,13 @@ function formatLocalDuration(milliseconds: number) {
   if (milliseconds < 1_000) return 'أقل من ثانية';
   const seconds = milliseconds / 1_000;
   return `${seconds < 10 ? seconds.toFixed(1) : Math.round(seconds)} ثانية`;
+}
+
+/** الصور الرأسية غالباً صور شخص؛ نعرضها بكامل ارتفاعها بدلاً من تكبير قد يقص الرأس أو الأطراف. */
+function shouldPreserveFullHeight(image: { width?: number; height?: number }): boolean {
+  if (!image.width || !image.height) return false;
+  const ratio = image.width / Math.max(1, image.height);
+  return ratio >= .42 && ratio <= .9 && image.height > image.width;
 }
 
 function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
