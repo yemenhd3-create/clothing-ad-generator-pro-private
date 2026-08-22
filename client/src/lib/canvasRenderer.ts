@@ -44,6 +44,7 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
 
   if (!studioOnly) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
   await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', studioOnly);
+  if (studioOnly) drawWardrobeOverlays(ctx, template, layout);
   if (!studioOnly) {
     drawBadges(ctx, details, template, geometry.badge, layout, palette);
     if (template.showQuantity || template.showColors) drawInformationPanel(ctx, details, template, geometry.info, layout, palette);
@@ -156,13 +157,38 @@ function drawWardrobeBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop:
   ctx.restore();
 }
 
+function drawWardrobeOverlays(ctx: CanvasRenderingContext2D, template: TemplateSettings, layout: Layout) {
+  drawWardrobeLabel(ctx, template.studioCaption?.trim() || '', {
+    textColor: template.studioCaptionTextColor || '#111827', backgroundColor: template.studioCaptionBackgroundColor || '',
+    top: layout.height * .045, right: layout.width * .045, maxWidth: layout.width * .62, fontSize: layout.width > layout.height ? 34 : 40,
+  }, layout);
+  drawWardrobeLabel(ctx, template.studioPrice?.trim() || '', {
+    textColor: template.studioPriceTextColor || '#111827', backgroundColor: template.studioPriceBackgroundColor || '',
+    top: layout.height * .89, right: layout.width * .045, maxWidth: layout.width * .38, fontSize: layout.width > layout.height ? 38 : 48,
+  }, layout);
+}
+
+function drawWardrobeLabel(ctx: CanvasRenderingContext2D, value: string, options: { textColor: string; backgroundColor: string; top: number; right: number; maxWidth: number; fontSize: number }, layout: Layout) {
+  if (!value) return;
+  ctx.save(); ctx.font = layout.font(900, options.fontSize);
+  const text = truncateToWidth(ctx, value, options.maxWidth - layout.width * .05);
+  const paddingX = layout.width * .022; const paddingY = layout.width * .012;
+  const width = Math.min(options.maxWidth, ctx.measureText(text).width + paddingX * 2);
+  const height = Math.round(options.fontSize * layout.scale * 1.42 + paddingY * 2);
+  const x = layout.width - options.right - width;
+  if (options.backgroundColor && options.backgroundColor !== 'transparent') {
+    ctx.fillStyle = options.backgroundColor; roundedRect(ctx, x, options.top, width, height, Math.min(height / 2, layout.width * .035)); ctx.fill();
+  }
+  ctx.fillStyle = options.textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + width / 2, options.top + height / 2); ctx.restore();
+}
+
 async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Box, visualMode: 'garment' | 'transparentPerson', transform?: { x: number; y: number; width: number; height: number }, productScale?: number, shadow: ProductShadowPreset = 'soft', studioOnly = false) {
   const padding = Math.min(box.width, box.height) * (studioOnly ? .06 : .015);
   const safeBox = { x: box.x + padding, y: box.y + padding, width: box.width - padding * 2, height: box.height - padding * 2 };
   const selected = transform ? constrainedHeroTransform(safeBox, transform) : safeBox;
   const image = await loadImage(imageSrc);
   const sourceBounds = getVisibleImageBounds(image);
-  const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(.92, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
+  const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(1.16, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
   ctx.save();
   ctx.beginPath(); ctx.rect(safeBox.x, safeBox.y, safeBox.width, safeBox.height); ctx.clip();
   drawProductShadow(ctx, placement, shadow);

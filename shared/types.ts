@@ -191,7 +191,7 @@ export interface DesignSuggestion {
 export type TemplateBadgeType = 'none' | 'discount' | 'new' | 'offer' | 'price' | 'quality';
 /** حجم القطعة داخل مساحتها الآمنة؛ يحمي القص من التداخل مع عناصر القالب. */
 export const PRODUCT_SCALE_MIN = 0.72;
-export const PRODUCT_SCALE_MAX = 1;
+export const PRODUCT_SCALE_MAX = 1.16;
 export const PRODUCT_SCALE_STEP = 0.04;
 export const DEFAULT_PRODUCT_SCALE = 0.92;
 /** نمط بصري محلي مستقل عن مقاس التصدير؛ يبقى اختياريًا لتوافق المسودات القديمة. */
@@ -249,6 +249,15 @@ export interface TemplateSettings {
   productScale?: number;
   productBackdrop?: ProductStudioBackdrop;
   productShadow?: ProductShadowPreset;
+  /** نص اختياري في أعلى قالب غرفة الملابس؛ يبقى القالب خالياً عند غيابه. */
+  studioCaption?: string;
+  studioCaptionTextColor?: string;
+  /** اتركها فارغة أو transparent لعرض النص من دون شارة خلفية. */
+  studioCaptionBackgroundColor?: string;
+  /** سعر اختياري في أسفل قالب غرفة الملابس؛ لا يعتمد على بيانات الإعلان القديمة. */
+  studioPrice?: string;
+  studioPriceTextColor?: string;
+  studioPriceBackgroundColor?: string;
   /** وضع غرفة الملابس: يرسم المنتج المفصول داخل خلفية كاملة بلا بيانات أو شارات أو طبقات إعلان. */
   wardrobeStudio?: boolean;
 }
@@ -494,6 +503,12 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   productScale: DEFAULT_PRODUCT_SCALE,
   productBackdrop: 'soft',
   productShadow: 'grounded',
+  studioCaption: '',
+  studioCaptionTextColor: '#111827',
+  studioCaptionBackgroundColor: '',
+  studioPrice: '',
+  studioPriceTextColor: '#111827',
+  studioPriceBackgroundColor: '',
 };
 
 export const DISCOUNT_BADGE_COLOR = '#C41A1A';

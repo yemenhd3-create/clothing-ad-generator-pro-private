@@ -106,7 +106,7 @@ describe('Canvas advertisement renderer', () => {
     const normalWidth = context.__drawImage.mock.calls.at(-1)?.[7] as number;
 
     context.__drawImage.mockClear();
-    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productScale: 1 }, 'blob:garment-image', { width: 1080, height: 1350 });
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productScale: 1.16 }, 'blob:garment-image', { width: 1080, height: 1350 });
     const enlargedWidth = context.__drawImage.mock.calls.at(-1)?.[7] as number;
 
     expect(enlargedWidth).toBeGreaterThan(normalWidth);
@@ -173,5 +173,16 @@ describe('Canvas advertisement renderer', () => {
     expect(garmentCall?.[5]).toBeGreaterThan(160);
     expect(garmentCall?.[7]).toBeGreaterThan(550);
     expect(context.__fillText).not.toHaveBeenCalledWith('✓', expect.any(Number), expect.any(Number));
+  });
+
+  it('يرسم النص والسعر الاختياريين في قالب غرفة الملابس من دون إظهار أي طبقة عند غيابهما', async () => {
+    await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:garment-image', { width: 1080, height: 1350 });
+    expect(context.__fillText).not.toHaveBeenCalledWith('متوفر لدى مركز السعر المناسب', expect.any(Number), expect.any(Number));
+    context.__fillText.mockClear();
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, studioCaption: 'متوفر لدى مركز السعر المناسب', studioCaptionTextColor: '#111827', studioCaptionBackgroundColor: '#ff5757', studioPrice: 'السعر 500', studioPriceTextColor: '#111827', studioPriceBackgroundColor: '#ffe600' }, 'blob:garment-image', { width: 1080, height: 1350 });
+    expect(context.__fillText).toHaveBeenCalledWith('متوفر لدى مركز السعر المناسب', expect.any(Number), expect.any(Number));
+    expect(context.__fillText).toHaveBeenCalledWith('السعر 500', expect.any(Number), expect.any(Number));
+    expect(context.__fillStyles).toContain('#ff5757');
+    expect(context.__fillStyles).toContain('#ffe600');
   });
 });
