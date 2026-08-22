@@ -249,6 +249,8 @@ export interface TemplateSettings {
   productScale?: number;
   productBackdrop?: ProductStudioBackdrop;
   productShadow?: ProductShadowPreset;
+  /** وضع غرفة الملابس: يرسم المنتج المفصول داخل خلفية كاملة بلا بيانات أو شارات أو طبقات إعلان. */
+  wardrobeStudio?: boolean;
 }
 
 // ========== Store Settings ==========
@@ -491,7 +493,7 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   artworkLayouts: {},
   productScale: DEFAULT_PRODUCT_SCALE,
   productBackdrop: 'soft',
-  productShadow: 'soft',
+  productShadow: 'grounded',
 };
 
 export const DISCOUNT_BADGE_COLOR = '#C41A1A';

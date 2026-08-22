@@ -91,11 +91,11 @@ describe('Canvas advertisement renderer', () => {
   it('anchors a transparent on-model result near the bottom of the white product card', async () => {
     context.__drawImage.mockClear();
     await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:garment-image', { width: 1080, height: 1350, visualMode: 'garment' });
-    const garmentY = context.__drawImage.mock.calls.at(-1)?.[2] as number;
+    const garmentY = context.__drawImage.mock.calls.at(-1)?.[6] as number;
 
     context.__drawImage.mockClear();
     await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:transparent-person', { width: 1080, height: 1350, visualMode: 'transparentPerson' });
-    const personY = context.__drawImage.mock.calls.at(-1)?.[2] as number;
+    const personY = context.__drawImage.mock.calls.at(-1)?.[6] as number;
 
     expect(personY).toBeLessThan(garmentY);
   });
@@ -103,11 +103,11 @@ describe('Canvas advertisement renderer', () => {
   it('يكبر المنتج داخل منطقة البطل عند اختيار حجم أكبر من الافتراضي من دون تغيير عناصر القالب الأخرى', async () => {
     context.__drawImage.mockClear();
     await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productScale: .76 }, 'blob:garment-image', { width: 1080, height: 1350 });
-    const normalWidth = context.__drawImage.mock.calls.at(-1)?.[3] as number;
+    const normalWidth = context.__drawImage.mock.calls.at(-1)?.[7] as number;
 
     context.__drawImage.mockClear();
     await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productScale: 1 }, 'blob:garment-image', { width: 1080, height: 1350 });
-    const enlargedWidth = context.__drawImage.mock.calls.at(-1)?.[3] as number;
+    const enlargedWidth = context.__drawImage.mock.calls.at(-1)?.[7] as number;
 
     expect(enlargedWidth).toBeGreaterThan(normalWidth);
   });
@@ -170,8 +170,8 @@ describe('Canvas advertisement renderer', () => {
   it('يعطي قالب غرفة الملابس الافتراضي مساحة استديو كبيرة للقطعة من دون نص أو شارات افتراضية', async () => {
     await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:garment-image', { width: 1080, height: 1350 });
     const garmentCall = context.__drawImage.mock.calls.at(-1);
-    expect(garmentCall?.[1]).toBeGreaterThan(160);
-    expect(garmentCall?.[3]).toBeGreaterThan(550);
+    expect(garmentCall?.[5]).toBeGreaterThan(160);
+    expect(garmentCall?.[7]).toBeGreaterThan(550);
     expect(context.__fillText).not.toHaveBeenCalledWith('✓', expect.any(Number), expect.any(Number));
   });
 });

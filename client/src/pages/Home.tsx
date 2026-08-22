@@ -78,6 +78,18 @@ const EMPTY_AD_DETAILS: AdDetails = { ...DEFAULT_AD_DETAILS, features: [] };
 /** يجعل النتيجة البصرية للقطعة هي المسار الافتراضي، ويؤجل الأدوات الثانوية عن المستخدم العادي. */
 const WARDROBE_ROOM_MODE = import.meta.env.MODE !== 'test';
 
+function createWardrobeTemplate(template: TemplateSettings): TemplateSettings {
+  return {
+    ...template,
+    wardrobeStudio: true,
+    showProductName: false, showHeadline: false, showDiscount: false, showQuantity: false, showColors: false,
+    showFeatures: false, showPrice: false, showStoreInfo: false, showFrame: false, showQualityMark: false,
+    badgeType: 'none', badgeTypes: [], showHeaderArtwork: false, showStoreLogo: false, showFooterArtwork: false,
+  };
+}
+
+function createWardrobeDetails(): AdDetails { return { ...DEFAULT_AD_DETAILS, colors: [], features: [] }; }
+
 const WORKFLOW_STEPS: Array<{ id: AdWorkflowStep; label: string }> = [
   { id: 'upload', label: 'رفع الملابس' },
   { id: 'details', label: 'بيانات الإعلان' },
@@ -291,6 +303,12 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setDesignSuggestion(null);
     setTemplateBeforeSuggestion(null);
     setCurrentStep('upload');
+    if (WARDROBE_ROOM_MODE) {
+      setIsReviewingImage(false);
+      toast.success('تم رفع الصورة. نبدأ تفريغ الخلفية محلياً الآن.');
+      void generateAd(imageUrl);
+      return;
+    }
     setIsReviewingImage(true);
     toast.success('تمت إضافة الصورة. راجعها ثم تابع إلى بيانات الإعلان.');
   };
@@ -408,8 +426,9 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     toast.success('تمت إعادة إعدادات القالب السابقة.');
   };
 
-  const generateAd = async () => {
-    if (!productImage) {
+  const generateAd = async (imageSource?: string) => {
+    const sourceImage = imageSource || productImage;
+    if (!sourceImage) {
       setCurrentStep('upload');
       return;
     }
@@ -432,14 +451,16 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     if (acceptedPersonSource) {
       try {
         setTryOnResult(current => ({ ...current, message: 'نجهّز إعلانك من نتيجة التلبيس التي اعتمدتها…' }));
-        const dimensions = getCanvasDimensions(templateSettings.size);
+        const renderTemplate = WARDROBE_ROOM_MODE ? createWardrobeTemplate(templateSettings) : templateSettings;
+        const renderDetails = WARDROBE_ROOM_MODE ? createWardrobeDetails() : adDetails;
+        const dimensions = getCanvasDimensions(renderTemplate.size);
         const output = await withTimeout(
-          renderAd(adDetails, templateSettings, acceptedPersonSource, { ...dimensions, visualMode: 'transparentPerson', garmentTransform: templateSettings.smartGarmentTransform }),
+          renderAd(renderDetails, renderTemplate, acceptedPersonSource, { ...dimensions, visualMode: 'transparentPerson', garmentTransform: renderTemplate.smartGarmentTransform }),
           15_000,
           'انتهت مهلة إنشاء الإعلان. أعد المحاولة أو استخدم الصورة الأصلية.'
         );
         setGeneratedAd(output);
-        setMarketingText(buildMarketingText(adDetails));
+        setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(adDetails));
         if (WARDROBE_ROOM_MODE) {
           setIsGenerating(false);
           return;
@@ -459,7 +480,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
     let localImage;
     try {
-      localImage = await removeBackgroundLocally(productImage, stage => {
+      localImage = await removeBackgroundLocally(sourceImage, stage => {
         setTryOnResult({ status: 'processing', message: getLocalStageMessage(stage) });
       });
     } catch (error) {
@@ -478,16 +499,18 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         isTransparent: true,
         transparentSubject: 'garment',
       });
-      const dimensions = getCanvasDimensions(templateSettings.size);
+      const renderTemplate = WARDROBE_ROOM_MODE ? createWardrobeTemplate(templateSettings) : templateSettings;
+      const renderDetails = WARDROBE_ROOM_MODE ? createWardrobeDetails() : adDetails;
+      const dimensions = getCanvasDimensions(renderTemplate.size);
       setLastVisualSource(localImage.imageUrl);
       const output = await withTimeout(
-        renderAd(adDetails, templateSettings, localImage.imageUrl, { ...dimensions, visualMode: 'garment', garmentTransform: templateSettings.smartGarmentTransform }),
+        renderAd(renderDetails, renderTemplate, localImage.imageUrl, { ...dimensions, visualMode: 'garment', garmentTransform: renderTemplate.smartGarmentTransform }),
         15_000,
         'انتهت مهلة إنشاء الإعلان. جرّب صورة أصغر أو أعد المحاولة.'
       );
 
       setGeneratedAd(output);
-      setMarketingText(buildMarketingText(adDetails));
+      setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(adDetails));
       if (WARDROBE_ROOM_MODE) return;
       const document = compileDesignDocument(adDetails, templateSettings, designSuggestion);
       const contract = evaluateDesignContract(document);
@@ -568,8 +591,9 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setVisualRepairSnapshot(null);
     setVisualRepairStatus('idle');
     try {
-      const activeTemplate = templateOverride || templateSettings;
-      const activeDetails = detailsOverride || adDetails;
+      const requestedTemplate = templateOverride || templateSettings;
+      const activeTemplate = WARDROBE_ROOM_MODE ? createWardrobeTemplate(requestedTemplate) : requestedTemplate;
+      const activeDetails = WARDROBE_ROOM_MODE ? createWardrobeDetails() : (detailsOverride || adDetails);
       const dimensions = getCanvasDimensions(activeTemplate.size);
       const output = await withTimeout(
         renderAd(activeDetails, activeTemplate, source, { ...dimensions, visualMode: tryOnResult.transparentSubject === 'person' ? 'transparentPerson' : 'garment', garmentTransform: activeTemplate.smartGarmentTransform }),
@@ -577,7 +601,8 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         'انتهت مهلة إعادة بناء الإعلان. أعد المحاولة أو جرّب صورة أصغر.'
       );
       setGeneratedAd(output);
-      setMarketingText(buildMarketingText(activeDetails));
+      setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(activeDetails));
+      if (WARDROBE_ROOM_MODE) { toast.success(successMessage); return true; }
       const document = compileDesignDocument(activeDetails, activeTemplate, designSuggestion);
       const contract = evaluateDesignContract(document);
       const pixelTruth = await inspectRenderedPixelTruth(output, document);
@@ -1124,7 +1149,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
             <button
               type="button"
-              onClick={generateAd}
+              onClick={() => void generateAd()}
               className="reference-primary mt-5 w-full"
             >
               <Sparkles size={20} /> إنشاء الإعلان
@@ -1143,7 +1168,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">{!WARDROBE_ROOM_MODE && <button type="button" disabled={isGenerating} onClick={() => { void regenerateWithCurrentSettings(); }} className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-sm font-bold text-primary-foreground transition active:scale-95 disabled:opacity-50"><RotateCcw size={16} />{isGenerating ? 'جارٍ التحديث' : 'إعادة توليد بالتغييرات الجديدة'}</button>}<button
                     type="button"
-                    onClick={() => { if (WARDROBE_ROOM_MODE) { setCurrentStep('upload'); setIsReviewingImage(true); } else setCurrentStep('details'); }}
+                    onClick={() => { if (WARDROBE_ROOM_MODE) handleImageRemove(); else setCurrentStep('details'); }}
                     className="inline-flex items-center gap-1 rounded-xl bg-secondary px-3 py-2 text-sm font-bold text-primary transition active:scale-95"
                   >
                     <Pencil size={16} /> تعديل
@@ -1169,14 +1194,14 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   />
                   {WARDROBE_ROOM_MODE && <StudioAppearanceControls settings={templateSettings} disabled={isGenerating} onChange={handleStudioAppearanceChange} />}
                   <ProductScaleControl scale={clampProductScale(templateSettings.productScale)} disabled={isGenerating} onCommit={handleProductScaleCommit} />
-                  <React.Suspense fallback={null}><TryOnStatusNotice result={tryOnResult} /></React.Suspense>
+                  {!WARDROBE_ROOM_MODE && <React.Suspense fallback={null}><TryOnStatusNotice result={tryOnResult} /></React.Suspense>}
                 </>
               )}
 
               {!isGenerating && tryOnResult.status === 'unavailable' && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-center" role="alert">
                   <p className="font-bold text-red-900">{tryOnResult.message}</p>
-                  <button type="button" onClick={generateAd} className="mt-3 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white">إعادة المحاولة</button>
+                  <button type="button" onClick={() => void generateAd()} className="mt-3 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white">إعادة المحاولة</button>
                 </div>
               )}
             </div>
@@ -1243,8 +1268,8 @@ function StudioAppearanceControls({ settings, disabled, onChange }: { settings: 
   ];
   return <section className="mt-4 rounded-2xl border border-primary/10 bg-secondary/[0.18] p-4" aria-label="ضبط غرفة الملابس">
     <div className="flex items-center gap-2 text-primary"><Palette size={18} /><h3 className="text-sm font-black">غرفة الملابس</h3></div>
-    <p className="mt-1 text-xs leading-5 text-muted-foreground">الخلفية والظل يطبقان محلياً على صورة القطعة المفرغة.</p>
-    <div className="mt-3"><span className="text-xs font-black text-primary">الخلفية</span><div className="mt-2 grid grid-cols-4 gap-2">{backdrops.map(backdrop => <button key={backdrop.id} type="button" disabled={disabled} aria-pressed={(settings.productBackdrop || 'auto') === backdrop.id} onClick={() => onChange({ productBackdrop: backdrop.id, productShadow: settings.productShadow })} className={`rounded-xl px-2 py-2 text-xs font-black transition active:scale-95 disabled:opacity-50 ${(settings.productBackdrop || 'auto') === backdrop.id ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{backdrop.label}</button>)}</div></div>
+    <p className="mt-1 text-xs leading-5 text-muted-foreground">الخلفية تغيّر القالب كاملاً، والظل يوضع أسفل القطعة المفرغة محلياً.</p>
+    <div className="mt-3"><span className="text-xs font-black text-primary">خلفية القالب كاملة</span><div className="mt-2 grid grid-cols-4 gap-2">{backdrops.map(backdrop => <button key={backdrop.id} type="button" disabled={disabled} aria-pressed={(settings.productBackdrop || 'auto') === backdrop.id} onClick={() => onChange({ productBackdrop: backdrop.id, productShadow: settings.productShadow })} className={`rounded-xl px-2 py-2 text-xs font-black transition active:scale-95 disabled:opacity-50 ${(settings.productBackdrop || 'auto') === backdrop.id ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{backdrop.label}</button>)}</div></div>
     <div className="mt-3"><span className="text-xs font-black text-primary">الظل تحت المنتج</span><div className="mt-2 grid grid-cols-3 gap-2">{shadows.map(shadow => <button key={shadow.id} type="button" disabled={disabled} aria-pressed={(settings.productShadow || 'soft') === shadow.id} onClick={() => onChange({ productBackdrop: settings.productBackdrop, productShadow: shadow.id })} className={`rounded-xl px-2 py-2 text-xs font-black transition active:scale-95 disabled:opacity-50 ${(settings.productShadow || 'soft') === shadow.id ? 'bg-primary text-primary-foreground' : 'bg-white text-primary shadow-sm'}`}>{shadow.label}</button>)}</div></div>
   </section>;
 }

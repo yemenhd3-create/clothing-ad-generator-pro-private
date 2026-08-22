@@ -13,6 +13,7 @@ export interface RenderOptions {
 
 const TEMPLATE_FONT_FAMILY = 'Cairo, Tahoma, Arial, sans-serif';
 type Box = { x: number; y: number; width: number; height: number };
+type ImageSourceBounds = { x: number; y: number; width: number; height: number };
 type Geometry = { safe: Box; header: Box; logo: Box; hero: Box; info: Box; price: Box; features: Box; footer: Box; badge: Box };
 type Layout = { font: (weight: number, size: number) => string; width: number; height: number; scale: number };
 
@@ -31,32 +32,35 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   const palette = getTemplateTheme(template.visualTheme).palette;
   const studioOnly = isStudioOnly(details, template);
   const hero = studioOnly ? createStudioHero(template.size, width, height) : geometry.hero;
-  ctx.fillStyle = template.smartBackgroundColor || palette.background;
-  ctx.fillRect(0, 0, width, height);
+  if (studioOnly) drawWardrobeBackdrop(ctx, { x: 0, y: 0, width, height }, template.productBackdrop || 'soft', palette);
+  else { ctx.fillStyle = template.smartBackgroundColor || palette.background; ctx.fillRect(0, 0, width, height); }
 
   const logoTransform = getArtworkTransform(template, 'logo');
   const footerTransform = getArtworkTransform(template, 'footer');
-  drawTextHeader(ctx, details, template, geometry.header, layout, palette);
-  if (template.showStoreLogo && template.storeLogoArtwork) await drawCircularLogo(ctx, template.storeLogoArtwork, toPixelBox(logoTransform, width, height));
+  if (!studioOnly) {
+    drawTextHeader(ctx, details, template, geometry.header, layout, palette);
+    if (template.showStoreLogo && template.storeLogoArtwork) await drawCircularLogo(ctx, template.storeLogoArtwork, toPixelBox(logoTransform, width, height));
+  }
 
-  if (studioOnly) drawStudioStage(ctx, hero, template.productBackdrop || 'auto', palette);
-  else drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
+  if (!studioOnly) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
   await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', studioOnly);
-  drawBadges(ctx, details, template, geometry.badge, layout, palette);
-  if (template.showQuantity || template.showColors) drawInformationPanel(ctx, details, template, geometry.info, layout, palette);
-  if (template.showPrice && details.price.trim()) drawPricePanel(ctx, details, geometry.price, layout, palette);
-  if (template.showFeatures && details.features.filter(Boolean).length) drawFeatureBadges(ctx, details.features.filter(Boolean).slice(0, 2), geometry.features, layout, palette);
-  if (template.showFooterArtwork && template.footerArtwork) await drawArtwork(ctx, template.footerArtwork, toPixelBox(footerTransform, width, height), footerTransform.fit);
-  else if (template.showStoreInfo && (details.storeName.trim() || details.storePhone.trim())) drawFooter(ctx, details, geometry.footer, layout, palette);
+  if (!studioOnly) {
+    drawBadges(ctx, details, template, geometry.badge, layout, palette);
+    if (template.showQuantity || template.showColors) drawInformationPanel(ctx, details, template, geometry.info, layout, palette);
+    if (template.showPrice && details.price.trim()) drawPricePanel(ctx, details, geometry.price, layout, palette);
+    if (template.showFeatures && details.features.filter(Boolean).length) drawFeatureBadges(ctx, details.features.filter(Boolean).slice(0, 2), geometry.features, layout, palette);
+    if (template.showFooterArtwork && template.footerArtwork) await drawArtwork(ctx, template.footerArtwork, toPixelBox(footerTransform, width, height), footerTransform.fit);
+    else if (template.showStoreInfo && (details.storeName.trim() || details.storePhone.trim())) drawFooter(ctx, details, geometry.footer, layout, palette);
+  }
 
   const blob = await canvasToBlob(canvas, 'image/png', options.quality || 0.92);
   return URL.createObjectURL(blob);
 }
 
 function isStudioOnly(details: AdDetails, template: TemplateSettings) {
-  return !details.productName.trim() && !details.headline.trim() && !details.price.trim()
+  return template.wardrobeStudio === true || (!details.productName.trim() && !details.headline.trim() && !details.price.trim()
     && !details.quantity.trim() && details.colors.length === 0 && details.features.filter(Boolean).length === 0
-    && !details.storeName.trim() && !details.storePhone.trim() && !template.storeLogoArtwork && !template.footerArtwork;
+    && !details.storeName.trim() && !details.storePhone.trim() && !template.storeLogoArtwork && !template.footerArtwork);
 }
 
 function createStudioHero(size: TemplateSize, width: number, height: number): Box {
@@ -134,7 +138,7 @@ function drawHeroBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop: Pro
   ctx.restore();
 }
 
-function drawStudioStage(ctx: CanvasRenderingContext2D, box: Box, backdrop: ProductStudioBackdrop, palette: TemplateThemePalette) {
+function drawWardrobeBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop: ProductStudioBackdrop, palette: TemplateThemePalette) {
   ctx.save();
   const colors: Record<ProductStudioBackdrop, [string, string]> = {
     auto: ['#ffffff', '#f1edf8'],
@@ -147,9 +151,8 @@ function drawStudioStage(ctx: CanvasRenderingContext2D, box: Box, backdrop: Prod
   const gradient = ctx.createRadialGradient(box.x + box.width / 2, box.y + box.height * .35, Math.max(1, box.width * .02), box.x + box.width / 2, box.y + box.height * .52, Math.max(box.width, box.height) * .7);
   gradient.addColorStop(0, center);
   gradient.addColorStop(1, edge);
-  roundedRect(ctx, box.x, box.y, box.width, box.height, Math.min(box.width, box.height) * .055);
   ctx.fillStyle = gradient;
-  ctx.fill();
+  ctx.fillRect(box.x, box.y, box.width, box.height);
   ctx.restore();
 }
 
@@ -158,12 +161,13 @@ async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Bo
   const safeBox = { x: box.x + padding, y: box.y + padding, width: box.width - padding * 2, height: box.height - padding * 2 };
   const selected = transform ? constrainedHeroTransform(safeBox, transform) : safeBox;
   const image = await loadImage(imageSrc);
-  const placement = calculateImagePlacement(image, selected, visualMode, studioOnly ? Math.min(.92, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
+  const sourceBounds = getVisibleImageBounds(image);
+  const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(.92, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
   ctx.save();
   ctx.beginPath(); ctx.rect(safeBox.x, safeBox.y, safeBox.width, safeBox.height); ctx.clip();
   drawProductShadow(ctx, placement, shadow);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, placement.x, placement.y, placement.width, placement.height);
+  ctx.drawImage(image, sourceBounds.x, sourceBounds.y, sourceBounds.width, sourceBounds.height, placement.x, placement.y, placement.width, placement.height);
   ctx.restore();
 }
 
@@ -320,7 +324,7 @@ async function drawCircularLogo(ctx: CanvasRenderingContext2D, source: string, b
   ctx.save(); ctx.beginPath(); ctx.arc(x + diameter / 2, y + diameter / 2, diameter / 2, 0, Math.PI * 2); ctx.strokeStyle = 'rgba(255,255,255,.94)'; ctx.lineWidth = Math.max(2, diameter * .055); ctx.stroke(); ctx.restore();
 }
 
-function calculateImagePlacement(image: HTMLImageElement, box: Box, visualMode: 'garment' | 'transparentPerson', productScale: number): Box {
+function calculateImagePlacement(image: Pick<ImageSourceBounds, 'width' | 'height'>, box: Box, visualMode: 'garment' | 'transparentPerson', productScale: number): Box {
   const usesPersonPlacement = visualMode === 'transparentPerson';
   const widthLimit = usesPersonPlacement ? box.width * .94 : box.width;
   const heightLimit = usesPersonPlacement ? box.height * .985 : box.height;
@@ -333,6 +337,32 @@ function calculateImagePlacement(image: HTMLImageElement, box: Box, visualMode: 
     width: drawWidth,
     height: drawHeight,
   };
+}
+
+function getVisibleImageBounds(image: HTMLImageElement): ImageSourceBounds {
+  const full = { x: 0, y: 0, width: image.width, height: image.height };
+  if (!image.naturalWidth || !image.naturalHeight || typeof document === 'undefined') return full;
+  try {
+    const ratio = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * ratio)); const height = Math.max(1, Math.round(image.naturalHeight * ratio));
+    const scan = document.createElement('canvas'); scan.width = width; scan.height = height;
+    const scanContext = scan.getContext('2d', { willReadFrequently: true });
+    if (!scanContext) return full;
+    scanContext.drawImage(image, 0, 0, width, height);
+    const pixels = scanContext.getImageData(0, 0, width, height).data;
+    let left = width; let top = height; let right = -1; let bottom = -1;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] < 18) continue;
+      const pixel = (index - 3) / 4; const x = pixel % width; const y = Math.floor(pixel / width);
+      left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+    }
+    if (right < left || bottom < top) return full;
+    const inset = Math.max(2, Math.round(Math.min(right - left + 1, bottom - top + 1) * .025));
+    const safeLeft = Math.max(0, left - inset); const safeTop = Math.max(0, top - inset);
+    const safeRight = Math.min(width - 1, right + inset); const safeBottom = Math.min(height - 1, bottom + inset);
+    const sourceScale = 1 / ratio;
+    return { x: safeLeft * sourceScale, y: safeTop * sourceScale, width: (safeRight - safeLeft + 1) * sourceScale, height: (safeBottom - safeTop + 1) * sourceScale };
+  } catch { return full; }
 }
 
 function loadImage(source: string): Promise<HTMLImageElement> {
