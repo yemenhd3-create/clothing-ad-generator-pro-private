@@ -9,6 +9,7 @@ export default function DeveloperPersonalConsole() {
   const announcementsQuery = trpc.developer.personal.announcements.useQuery();
   const messagesQuery = trpc.developer.personal.messages.useQuery();
   const usersQuery = trpc.developer.personal.users.useQuery();
+  const accessSettingsQuery = trpc.developer.personal.accessSettings.useQuery();
   const [announcementId, setAnnouncementId] = useState<number | undefined>();
   const [announcement, setAnnouncement] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -39,6 +40,14 @@ export default function DeveloperPersonalConsole() {
     },
     onError: error => toast.error(error.message || 'تعذر تحديث حالة الحساب.'),
   });
+  const setLoginRequired = trpc.developer.personal.setLoginRequired.useMutation({
+    onSuccess: async settings => {
+      toast.success(settings.loginRequired ? 'تم تأمين صفحة الدخول.' : 'تم فتح الدخول المباشر للاختبار.');
+      await utils.developer.personal.accessSettings.invalidate();
+      await utils.projectAccess.mode.invalidate();
+    },
+    onError: error => toast.error(error.message || 'تعذر تحديث تأمين صفحة الدخول.'),
+  });
 
   const userCount = usersQuery.data?.length ?? 0;
   const activeUsers = usersQuery.data?.filter(user => user.isDisabled !== 1).length ?? 0;
@@ -53,6 +62,10 @@ export default function DeveloperPersonalConsole() {
           <Metric label="المفعّلة" value={activeUsers} />
           <Metric label="رسائل جديدة" value={newMessages} />
         </div>
+      </section>
+
+      <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
+        <div className="flex items-start justify-between gap-4"><div><h3 className="font-black text-primary">تأمين صفحة الدخول</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">عند التفعيل تظهر طرق التسجيل المعتادة. عند الإيقاف تُخفى طرق الدخول ويفتح المشروع مباشرة للاختبار.</p></div><button type="button" role="switch" aria-checked={accessSettingsQuery.data?.loginRequired !== false} disabled={accessSettingsQuery.isLoading || setLoginRequired.isPending} onClick={() => setLoginRequired.mutate({ loginRequired: accessSettingsQuery.data?.loginRequired === false })} className={`shrink-0 rounded-xl px-4 py-3 text-sm font-black transition active:scale-95 disabled:opacity-50 ${accessSettingsQuery.data?.loginRequired !== false ? 'bg-primary text-primary-foreground' : 'bg-amber-50 text-amber-900'}`}>{accessSettingsQuery.data?.loginRequired !== false ? 'مفعّل' : 'موقوف'}</button></div>
       </section>
 
       <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">

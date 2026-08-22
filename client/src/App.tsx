@@ -4,6 +4,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { isFriendTestMode } from "./lib/friendTestMode";
+import { trpc } from './lib/trpc';
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
@@ -47,7 +48,17 @@ function PersonalHome() {
   if (friendTestMode) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الاختبار…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
   }
-  return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
+  return <ProjectAccessGate />;
+}
+
+function ProjectAccessGate() {
+  const modeQuery = trpc.projectAccess.mode.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  if (modeQuery.isLoading) return <LoadingScreen text="جارٍ التحقق من تأمين صفحة الدخول…" />;
+  // عند أي خطأ نتبع الوضع الآمن ولا نفتح التطبيق مباشرة.
+  if (modeQuery.data?.loginRequired !== false) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
+  }
+  return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الدخول المباشر…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
 }
 
 function DeviceCheckHome() {

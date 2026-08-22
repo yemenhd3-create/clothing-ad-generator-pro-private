@@ -1,5 +1,5 @@
 import { desc, eq } from 'drizzle-orm';
-import { appAnnouncements, userMessages, users } from '../drizzle/schema';
+import { appAnnouncements, projectAccessSettings, userMessages, users } from '../drizzle/schema';
 import { getDb } from './db';
 
 function requireDb<T>(db: T | null): T {
@@ -88,4 +88,19 @@ export async function setPersonalUserAccess(id: number, isDisabled: boolean) {
   const db = requireDb(await getDb());
   await db.update(users).set({ isDisabled: isDisabled ? 1 : 0 }).where(eq(users.id, id));
   return { success: true } as const;
+}
+
+export async function getProjectAccessSettings() {
+  const db = requireDb(await getDb());
+  const current = (await db.select().from(projectAccessSettings).where(eq(projectAccessSettings.id, 1)).limit(1))[0];
+  if (current) return { loginRequired: current.loginRequired === 1 };
+  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1 });
+  return { loginRequired: true };
+}
+
+export async function setProjectLoginRequired(loginRequired: boolean) {
+  const db = requireDb(await getDb());
+  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: loginRequired ? 1 : 0 })
+    .onDuplicateKeyUpdate({ set: { loginRequired: loginRequired ? 1 : 0 } });
+  return { loginRequired };
 }

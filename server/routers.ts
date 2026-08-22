@@ -21,6 +21,8 @@ import {
   listDeveloperMessages,
   listPersonalUsers,
   saveAnnouncement,
+  getProjectAccessSettings,
+  setProjectLoginRequired,
   setPersonalUserAccess,
   updateUserMessageStatus,
 } from './personalWorkspace';
@@ -98,6 +100,10 @@ export const appRouter = router({
       setUserAccess: developerProcedure
         .input(z.object({ id: z.number().int().positive(), isDisabled: z.boolean() }))
         .mutation(({ input }) => setPersonalUserAccess(input.id, input.isDisabled)),
+      accessSettings: developerProcedure.query(() => getProjectAccessSettings()),
+      setLoginRequired: developerProcedure
+        .input(z.object({ loginRequired: z.boolean() }))
+        .mutation(({ input }) => setProjectLoginRequired(input.loginRequired)),
       accessCodes: router({
         list: developerProcedure.query(() => listAccessCodes()),
         create: developerProcedure
@@ -116,6 +122,9 @@ export const appRouter = router({
           .mutation(({ input }) => revokeAccessCode(input.id)),
       }),
     }),
+  }),
+  projectAccess: router({
+    mode: publicProcedure.query(async () => getProjectAccessSettings()),
   }),
   accessCodes: router({
     redeem: publicProcedure

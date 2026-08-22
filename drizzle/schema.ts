@@ -77,3 +77,12 @@ export const accessCodes = mysqlTable("access_codes", {
 });
 
 export type AccessCode = typeof accessCodes.$inferSelect;
+
+/** إعداد وحيد للمشروع: يحدد هل يلزم تسجيل الدخول قبل فتح غرفة الملابس. */
+export const projectAccessSettings = mysqlTable("project_access_settings", {
+  id: int("id").primaryKey(),
+  loginRequired: int("loginRequired").default(1).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProjectAccessSettings = typeof projectAccessSettings.$inferSelect;

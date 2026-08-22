@@ -4,7 +4,7 @@ const { getDb } = vi.hoisted(() => ({ getDb: vi.fn() }));
 
 vi.mock('./db', () => ({ getDb }));
 
-const { getActiveAnnouncement, getUserAccess } = await import('./personalWorkspace');
+const { getActiveAnnouncement, getProjectAccessSettings, getUserAccess, setProjectLoginRequired } = await import('./personalWorkspace');
 
 describe('personal workspace data access', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -21,5 +21,26 @@ describe('personal workspace data access', () => {
     getDb.mockResolvedValue({ select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ orderBy: vi.fn(() => ({ limit })) })) })) })) });
 
     await expect(getActiveAnnouncement()).resolves.toMatchObject({ id: 3, message: 'تم تحديث القالب' });
+  });
+
+  it('يبقي تسجيل الدخول مفعلاً افتراضياً عند غياب إعداد الوصول', async () => {
+    const limit = vi.fn().mockResolvedValue([]);
+    const values = vi.fn().mockResolvedValue(undefined);
+    getDb.mockResolvedValue({
+      select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit })) })) })),
+      insert: vi.fn(() => ({ values })),
+    });
+
+    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true });
+    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 1 });
+  });
+
+  it('يحفظ إيقاف تأمين الدخول ليُفتح المشروع مباشرة للاختبار', async () => {
+    const onDuplicateKeyUpdate = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn(() => ({ onDuplicateKeyUpdate }));
+    getDb.mockResolvedValue({ insert: vi.fn(() => ({ values })) });
+
+    await expect(setProjectLoginRequired(false)).resolves.toEqual({ loginRequired: false });
+    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 0 });
   });
 });
