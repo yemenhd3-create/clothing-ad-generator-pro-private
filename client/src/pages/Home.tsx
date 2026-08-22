@@ -108,6 +108,7 @@ function isWorkflowStep(value: string | null): value is AdWorkflowStep {
 type MainApplicationSection = 'create' | 'batch' | 'assistant' | 'settings';
 type ActiveView = MainApplicationSection | 'about' | 'developer' | 'messages';
 type VisualRepairStatus = 'idle' | 'repairing' | 'verified' | 'blocked' | 'failed' | 'undone';
+type WardrobeTool = 'backdrop' | 'shadow' | 'size' | 'overlay' | 'refine' | null;
 type VisualRepairSnapshot = {
   templateSettings: TemplateSettings;
   generatedAdBlob: Blob;
@@ -138,6 +139,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReviewingImage, setIsReviewingImage] = useState(false);
   const [isRefinementStudioOpen, setIsRefinementStudioOpen] = useState(false);
+  const [activeWardrobeTool, setActiveWardrobeTool] = useState<WardrobeTool>(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [isStorageReady, setIsStorageReady] = useState(false);
   const [designSuggestion, setDesignSuggestion] = useState<DesignSuggestion | null>(null);
@@ -1192,14 +1194,11 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
               {!isGenerating && generatedAd && WARDROBE_ROOM_MODE && (
                 <div className="flex h-full min-h-0 flex-col" aria-label="مساحة عمل غرفة الملابس">
-                  <div className="sticky top-0 z-20 shrink-0 bg-white pb-3">
-                    <div className="flex items-center justify-between gap-2 px-1 pb-3"><h2 className="text-sm font-black text-primary">غرفة الملابس</h2><span className="text-xs font-bold text-muted-foreground">القالب ثابت أثناء التعديل</span></div>
-                    <img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto w-full rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: '42svh' }} />
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-3" aria-label="أدوات تعديل غرفة الملابس">
-                    <StudioAppearanceControls settings={templateSettings} disabled={isGenerating} onChange={handleStudioAppearanceChange} />
-                    <ProductScaleControl scale={clampProductScale(templateSettings.productScale)} disabled={isGenerating} onCommit={handleProductScaleCommit} />
-                    <section className="mt-3 grid grid-cols-2 gap-3"><button type="button" onClick={handleDownload} className="reference-primary w-full"><Send size={18} />تنزيل</button><button type="button" onClick={() => void handleShare()} className="reference-outline w-full"><MessageCircle size={18} />مشاركة</button></section>
+                  <div className="relative flex min-h-0 flex-1 flex-col" aria-label="القالب ثابت وأدوات عائمة">
+                    <div className="flex items-center justify-between gap-2 px-1 pb-3"><h2 className="text-sm font-black text-primary">غرفة الملابس</h2><span className="text-xs font-bold text-muted-foreground">اضغط أداة للتعديل</span></div>
+                    <div className="flex min-h-0 flex-1 items-center justify-center"><img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto w-full rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: 'calc(100svh - 15rem)' }} /></div>
+                    {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} settings={templateSettings} disabled={isGenerating} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
+                    <WardrobeToolBar activeTool={activeWardrobeTool} onTool={tool => setActiveWardrobeTool(current => current === tool ? null : tool)} onDownload={handleDownload} onShare={() => void handleShare()} />
                   </div>
                 </div>
               )}
@@ -1271,6 +1270,36 @@ function ProductScaleControl({ scale, disabled, onCommit }: { scale: number; dis
     <div className="mt-4 flex items-center gap-3"><button type="button" disabled={disabled || draft <= PRODUCT_SCALE_MIN} onClick={() => commit(draft - PRODUCT_SCALE_STEP)} className="rounded-xl bg-white px-3 py-2 text-sm font-black text-primary shadow-sm disabled:opacity-50">أصغر</button><Slider value={[draft]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueChange={values => setDraft(clampProductScale(values[0] || DEFAULT_PRODUCT_SCALE))} onValueCommit={values => commit(values[0] || DEFAULT_PRODUCT_SCALE)} aria-label="تكبير أو تصغير المنتج" /><button type="button" disabled={disabled || draft >= PRODUCT_SCALE_MAX} onClick={() => commit(draft + PRODUCT_SCALE_STEP)} className="rounded-xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">أكبر</button></div>
     {draft !== DEFAULT_PRODUCT_SCALE && <button type="button" disabled={disabled} onClick={() => commit(DEFAULT_PRODUCT_SCALE)} className="mt-3 text-xs font-black text-primary disabled:opacity-50">إعادة الحجم المحسّن</button>}
   </section>;
+}
+
+function WardrobeToolBar({ activeTool, onTool, onDownload, onShare }: { activeTool: WardrobeTool; onTool: (tool: Exclude<WardrobeTool, null>) => void; onDownload: () => void; onShare: () => void }) {
+  const tools: Array<{ id: Exclude<WardrobeTool, null>; label: string; icon: React.ReactNode }> = [
+    { id: 'backdrop', label: 'الخلفية', icon: <Palette size={18} /> },
+    { id: 'shadow', label: 'الظل', icon: <Sparkles size={18} /> },
+    { id: 'size', label: 'الحجم', icon: <SlidersHorizontal size={18} /> },
+    { id: 'overlay', label: 'نص وسعر', icon: <Pencil size={18} /> },
+    { id: 'refine', label: 'تعديل الصورة', icon: <Wand2 size={18} /> },
+  ];
+  return <div className="shrink-0 border-t border-primary/10 bg-white pt-3"><div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}>{tools.map(tool => <button key={tool.id} type="button" aria-pressed={activeTool === tool.id} onClick={() => onTool(tool.id)} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-black ${activeTool === tool.id ? 'bg-primary text-primary-foreground' : 'text-primary'}`}>{tool.icon}<span>{tool.label}</span></button>)}</div><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={onDownload} className="reference-primary w-full"><Send size={16} />تنزيل</button><button type="button" onClick={onShare} className="reference-outline w-full"><MessageCircle size={16} />مشاركة</button></div></div>;
+}
+
+function WardrobeToolPanel({ tool, settings, disabled, onClose, onChange, onScaleCommit, onRefine }: { tool: Exclude<WardrobeTool, null>; settings: TemplateSettings; disabled: boolean; onClose: () => void; onChange: (patch: StudioAppearancePatch) => void; onScaleCommit: (value: number) => void; onRefine: () => void }) {
+  const backdrops: Array<{ id: NonNullable<TemplateSettings['productBackdrop']>; label: string }> = [{ id: 'soft', label: 'نظيف' }, { id: 'warm', label: 'دافئ' }, { id: 'cool', label: 'بارد' }, { id: 'spotlight', label: 'إضاءة' }];
+  const shadows: Array<{ id: NonNullable<TemplateSettings['productShadow']>; label: string }> = [{ id: 'none', label: 'بلا ظل' }, { id: 'soft', label: 'ناعم' }, { id: 'grounded', label: 'أرضي' }];
+  const currentScale = clampProductScale(settings.productScale);
+  const title = tool === 'backdrop' ? 'خلفية القالب' : tool === 'shadow' ? 'ظل تحت المنتج' : tool === 'size' ? 'حجم المنتج' : tool === 'overlay' ? 'نص وسعر' : 'تعديل الصورة';
+  return <section className="absolute inset-x-0 z-20 rounded-2xl border border-primary/15 bg-white p-3 shadow-xl" style={{ bottom: 96 }} aria-label={title}><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-black text-primary">{title}</h3><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-primary">إغلاق</button></div>{tool === 'backdrop' && <div className="grid grid-cols-4 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl px-2 py-3 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'shadow' && <div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl px-2 py-3 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onClose={onClose} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">افتح الممحاة والعصا والتحديد الحر لتعديل الحواف محلياً، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="reference-primary mt-3 w-full"><Wand2 size={17} />فتح تعديل الصورة</button></div>}</section>;
+}
+
+function FloatingOverlayEditor({ settings, disabled, onChange, onClose }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void; onClose: () => void }) {
+  const [layer, setLayer] = useState<'caption' | 'price'>('caption');
+  const isCaption = layer === 'caption';
+  const value = isCaption ? settings.studioCaption || '' : settings.studioPrice || '';
+  const textColor = isCaption ? settings.studioCaptionTextColor || '#111827' : settings.studioPriceTextColor || '#111827';
+  const backgroundColor = isCaption ? settings.studioCaptionBackgroundColor || '' : settings.studioPriceBackgroundColor || '';
+  const position = isCaption ? settings.studioCaptionPosition || { x: .73, y: .055 } : settings.studioPricePosition || { x: .78, y: .89 };
+  const updatePosition = (dx: number, dy: number) => { const next: StudioOverlayPosition = { x: Number(Math.min(.86, Math.max(.14, position.x + dx)).toFixed(2)), y: Number(Math.min(.9, Math.max(.04, position.y + dy)).toFixed(2)) }; onChange(isCaption ? { studioCaptionPosition: next } : { studioPricePosition: next }); };
+  return <div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLayer('caption')} className={`rounded-xl px-3 py-2 text-xs font-black ${isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>النص</button><button type="button" onClick={() => setLayer('price')} className={`rounded-xl px-3 py-2 text-xs font-black ${!isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>السعر</button></div><input value={value} disabled={disabled} maxLength={isCaption ? 80 : 32} onChange={event => onChange(isCaption ? { studioCaption: event.target.value } : { studioPrice: event.target.value })} placeholder={isCaption ? 'متوفر لدى مركز السعر المناسب' : 'السعر 500'} className="mt-2 min-h-11 w-full rounded-xl border border-primary/10 px-3 text-sm text-foreground outline-none focus:border-primary" /><div className="mt-2 grid grid-cols-2 gap-2"><ColorControl label="لون الخط" value={textColor} disabled={disabled} onChange={color => onChange(isCaption ? { studioCaptionTextColor: color } : { studioPriceTextColor: color })} /><BackgroundToggle active={Boolean(backgroundColor)} label="خلفية" disabled={disabled} onToggle={() => onChange(isCaption ? { studioCaptionBackgroundColor: backgroundColor ? '' : '#ff5757' } : { studioPriceBackgroundColor: backgroundColor ? '' : '#ffe600' })} /></div>{backgroundColor && <ColorControl label="لون الخلفية" value={backgroundColor} disabled={disabled} onChange={color => onChange(isCaption ? { studioCaptionBackgroundColor: color } : { studioPriceBackgroundColor: color })} />}<div className="mx-auto mt-2 grid grid-cols-3 gap-2" style={{ width: 144 }}><span /><MoveButton label="أعلى" disabled={disabled} onClick={() => updatePosition(0, -.04)}><ArrowUp size={16} /></MoveButton><span /><MoveButton label="يمين" disabled={disabled} onClick={() => updatePosition(.04, 0)}><ArrowRight size={16} /></MoveButton><button type="button" onClick={onClose} className="rounded-lg bg-secondary text-xs font-black text-primary">تم</button><MoveButton label="يسار" disabled={disabled} onClick={() => updatePosition(-.04, 0)}><ArrowLeft size={16} /></MoveButton><span /><MoveButton label="أسفل" disabled={disabled} onClick={() => updatePosition(0, .04)}><ArrowDown size={16} /></MoveButton><span /></div></div>;
 }
 
 type StudioAppearancePatch = Partial<Pick<TemplateSettings, 'productBackdrop' | 'productShadow' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioCaptionPosition' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor' | 'studioPricePosition'>>;
