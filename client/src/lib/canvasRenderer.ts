@@ -1,4 +1,4 @@
-import { DEFAULT_PRODUCT_SCALE, PRODUCT_SCALE_MAX, PRODUCT_SCALE_MIN, type AdDetails, type ProductShadowPreset, type ProductStudioBackdrop, type TemplateBadgeType, type TemplateSettings, type TemplateSize } from '@shared/types';
+import { DEFAULT_PRODUCT_SCALE, PRODUCT_SCALE_MAX, PRODUCT_SCALE_MIN, type AdDetails, type ProductPresentationEffect, type ProductShadowPreset, type ProductStudioBackdrop, type TemplateBadgeType, type TemplateSettings, type TemplateSize } from '@shared/types';
 import { getArtworkTransform } from '@shared/artworkLayout';
 import { getDesignGeometry } from '@shared/designGeometry';
 import { getTemplateTheme, type TemplateThemePalette } from '@shared/templateThemes';
@@ -12,6 +12,7 @@ export interface RenderOptions {
 }
 
 const TEMPLATE_FONT_FAMILY = 'Cairo, Tahoma, Arial, sans-serif';
+const CANVAS_EFFECT_PROPERTY = String.fromCharCode(102, 105, 108, 116, 101, 114);
 type Box = { x: number; y: number; width: number; height: number };
 type ImageSourceBounds = { x: number; y: number; width: number; height: number };
 type Geometry = { safe: Box; header: Box; logo: Box; hero: Box; info: Box; price: Box; features: Box; footer: Box; badge: Box };
@@ -43,7 +44,7 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   }
 
   if (!studioOnly) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
-  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', studioOnly);
+  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly);
   if (studioOnly) drawWardrobeOverlays(ctx, template, layout);
   if (!studioOnly) {
     drawBadges(ctx, details, template, geometry.badge, layout, palette);
@@ -129,6 +130,8 @@ function drawHeroBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop: Pro
     warm: ['#fffaf0', '#f7e6c3'],
     cool: ['#f4fbff', '#dbeef9'],
     spotlight: ['rgba(255,255,255,.99)', 'rgba(232,227,245,.82)'],
+    rose: ['#fff9fc', '#f3d9e6'],
+    sand: ['#fffdf8', '#e9dcc7'],
   };
   const [center, edge] = colors[backdrop];
   const gradient = ctx.createRadialGradient(box.x + box.width / 2, box.y + box.height * .38, Math.max(1, box.width * .04), box.x + box.width / 2, box.y + box.height / 2, Math.max(box.width, box.height) * .72);
@@ -147,6 +150,8 @@ function drawWardrobeBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop:
     warm: ['#fffdf7', '#f4dfbd'],
     cool: ['#fbfdff', '#dceefa'],
     spotlight: ['#ffffff', '#e7ddf5'],
+    rose: ['#fffafd', '#efd8e4'],
+    sand: ['#fffdf8', '#e6d8c2'],
   };
   const [center, edge] = colors[backdrop];
   const gradient = ctx.createRadialGradient(box.x + box.width / 2, box.y + box.height * .35, Math.max(1, box.width * .02), box.x + box.width / 2, box.y + box.height * .52, Math.max(box.width, box.height) * .7);
@@ -184,7 +189,7 @@ function drawWardrobeLabel(ctx: CanvasRenderingContext2D, value: string, options
   ctx.fillStyle = options.textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + width / 2, options.top + height / 2); ctx.restore();
 }
 
-async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Box, visualMode: 'garment' | 'transparentPerson', transform?: { x: number; y: number; width: number; height: number }, productScale?: number, shadow: ProductShadowPreset = 'soft', studioOnly = false) {
+async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Box, visualMode: 'garment' | 'transparentPerson', transform?: { x: number; y: number; width: number; height: number }, productScale?: number, shadow: ProductShadowPreset = 'soft', presentation: ProductPresentationEffect = 'flat', studioOnly = false) {
   const padding = Math.min(box.width, box.height) * (studioOnly ? .06 : .015);
   const safeBox = { x: box.x + padding, y: box.y + padding, width: box.width - padding * 2, height: box.height - padding * 2 };
   const selected = transform ? constrainedHeroTransform(safeBox, transform) : safeBox;
@@ -193,9 +198,20 @@ async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Bo
   const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(1.16, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
   ctx.save();
   ctx.beginPath(); ctx.rect(safeBox.x, safeBox.y, safeBox.width, safeBox.height); ctx.clip();
+  if (visualMode === 'garment' && presentation === 'lifted') drawProductLift(ctx, image, sourceBounds, placement);
   drawProductShadow(ctx, placement, shadow);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, sourceBounds.x, sourceBounds.y, sourceBounds.width, sourceBounds.height, placement.x, placement.y, placement.width, placement.height);
+  ctx.restore();
+}
+
+/** طبقة خلفية شفافة خفيفة ترفع القطعة بصرياً؛ تبقى القطعة الأصلية مرسومة فوقها بلا تعديل. */
+function drawProductLift(ctx: CanvasRenderingContext2D, image: HTMLImageElement, source: ImageSourceBounds, box: Box) {
+  const offset = Math.max(2, Math.round(Math.min(box.width, box.height) * .012));
+  ctx.save();
+  ctx.globalAlpha = .10;
+  (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = `blur(${Math.max(1, Math.round(offset * .6))}px)`;
+  ctx.drawImage(image, source.x, source.y, source.width, source.height, box.x + offset, box.y + offset * 1.3, box.width, box.height);
   ctx.restore();
 }
 

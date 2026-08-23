@@ -201,9 +201,11 @@ export const DEFAULT_PRODUCT_SCALE = 0.92;
 /** نمط بصري محلي مستقل عن مقاس التصدير؛ يبقى اختياريًا لتوافق المسودات القديمة. */
 export type TemplateVisualTheme = 'classic' | 'midnight' | 'rose' | 'mint' | 'sand';
 /** خلفية استديو محلية داخل منطقة المنتج؛ لا تتطلب نموذج صور أو اتصالاً خارجياً. */
-export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight';
+export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight' | 'rose' | 'sand';
 /** ظل هندسي محلي يوضع أسفل المنتج الشفاف داخل مساحة البطل. */
 export type ProductShadowPreset = 'none' | 'soft' | 'grounded';
+/** بروز بصري محلي خفيف؛ ليس نموذج 3D ولا ينشئ زوايا أو محتوى جديداً. */
+export type ProductPresentationEffect = 'flat' | 'lifted';
 /** موضع نسبي داخل قالب غرفة الملابس لطبقة نص اختيارية. */
 export interface StudioOverlayPosition { x: number; y: number; }
 export type ArtworkLayerKey = 'header' | 'footer' | 'logo';
@@ -255,6 +257,7 @@ export interface TemplateSettings {
   productScale?: number;
   productBackdrop?: ProductStudioBackdrop;
   productShadow?: ProductShadowPreset;
+  productPresentation?: ProductPresentationEffect;
   /** نص اختياري في أعلى قالب غرفة الملابس؛ يبقى القالب خالياً عند غيابه. */
   studioCaption?: string;
   studioCaptionTextColor?: string;
@@ -513,6 +516,7 @@ export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   productScale: DEFAULT_PRODUCT_SCALE,
   productBackdrop: 'soft',
   productShadow: 'grounded',
+  productPresentation: 'flat',
   studioCaption: '',
   studioCaptionTextColor: '#111827',
   studioCaptionBackgroundColor: '',

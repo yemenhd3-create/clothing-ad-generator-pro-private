@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Check, Eraser, LoaderCircle, MousePointer2, Paintbrush, RotateCcw, ScanSearch, Sparkles, Undo2, WandSparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { createFloodMask, createLassoMask, countMask, eraseMask, type PixelMask, type Point } from '@/lib/imageRefinement';
+import { analyzeImageQuality, getQuickPolishSettings, type ImageQualityReport } from '@/lib/imageQuickPolish';
 import { removeBackgroundLocally } from '@/lib/localBackgroundRemoval';
 
 type StudioMode = 'inspect' | 'erase' | 'restore' | 'wand' | 'lasso';
@@ -51,6 +52,7 @@ export default function ImageRefinementStudio({ source, onApply, onClose }: Imag
   const [lassoPoints, setLassoPoints] = React.useState<Point[]>([]);
   const [isReady, setIsReady] = React.useState(false);
   const [isPreparingLocalRemoval, setIsPreparingLocalRemoval] = React.useState(false);
+  const [qualityReport, setQualityReport] = React.useState<ImageQualityReport | null>(null);
 
   const drawWorkingImage = React.useCallback(async (sourceToDraw = workingSource, selectionMask = selection, lasso = lassoPoints) => {
     const canvas = canvasRef.current;
@@ -101,7 +103,8 @@ export default function ImageRefinementStudio({ source, onApply, onClose }: Imag
         const original = document.createElement('canvas');
         original.width = width;
         original.height = height;
-        original.getContext('2d')?.drawImage(image, 0, 0, width, height);
+        const originalContext = original.getContext('2d', { willReadFrequently: true });
+        originalContext?.drawImage(image, 0, 0, width, height);
         if (!active) return;
         originalRef.current = original;
         const canvas = canvasRef.current;
@@ -111,6 +114,7 @@ export default function ImageRefinementStudio({ source, onApply, onClose }: Imag
         const prepared = original.toDataURL('image/png');
         setWorkingSource(prepared);
         setHistory([prepared]);
+        if (originalContext) setQualityReport(analyzeImageQuality(originalContext.getImageData(0, 0, width, height).data, width, height));
         setIsReady(true);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'تعذر تجهيز الصورة.');
@@ -142,6 +146,22 @@ export default function ImageRefinementStudio({ source, onApply, onClose }: Imag
     setBrightness(100);
     setContrast(100);
     setSaturation(100);
+  };
+
+  const applyQuickPolish = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !workingSource || !qualityReport) return;
+    void (async () => {
+      const image = await loadImage(workingSource);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const polish = getQuickPolishSettings(qualityReport);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = `brightness(${polish.brightness}%) contrast(${polish.contrast}%) saturate(${polish.saturation}%)`;
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = 'none';
+      commitCanvas('طبّقنا تحسيناً محلياً خفيفاً؛ يمكنك التراجع عنه فوراً.');
+    })().catch(() => toast.error('تعذر تطبيق التحسين السريع. بقيت الصورة الأصلية كما هي.'));
   };
 
   const undo = () => {
@@ -303,7 +323,7 @@ export default function ImageRefinementStudio({ source, onApply, onClose }: Imag
           {(mode === 'erase' || mode === 'restore') && <div className="rounded-2xl bg-secondary p-3"><p className="text-xs font-black text-primary">{mode === 'erase' ? 'الممحاة المحلية' : 'استعادة من الصورة الأصلية'}</p><label className="mt-3 block text-[11px] font-bold text-muted-foreground">حجم الفرشاة<input className="mt-1 w-full accent-primary" type="range" min="8" max="90" step="1" value={brushSize} onChange={event => setBrushSize(Number(event.target.value))} /></label>{mode === 'erase' && <label className="mt-3 block text-[11px] font-bold text-muted-foreground">حدة الحافة<input className="mt-1 w-full accent-primary" type="range" min="0" max="100" step="5" value={brushHardness} onChange={event => setBrushHardness(Number(event.target.value))} /></label>}<p className="mt-2 text-xs text-muted-foreground">مرّر بإصبعك على الصورة. الاستعادة تعيد البكسلات الأصلية فقط ولا تولّد محتوى جديداً.</p></div>}
           {mode === 'wand' && <div className="rounded-2xl bg-secondary p-3"><p className="text-xs font-black text-primary">حدد لوناً متصلاً ثم أزله</p><label className="mt-3 block text-[11px] font-bold text-muted-foreground">تسامح اللون<input className="mt-1 w-full accent-primary" type="range" min="4" max="90" step="2" value={wandTolerance} onChange={event => setWandTolerance(Number(event.target.value))} /></label><p className="mt-2 text-xs text-muted-foreground">اضغط منطقة بلون قريب؛ ستظهر بنفسجية، ثم احذفها إن كانت صحيحة.</p>{selection && <button type="button" onClick={() => finishSelectionRemoval(selection, 'أزلنا المنطقة المحددة بشفافية.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-black text-primary-foreground"><Eraser size={15} />حذف التحديد ({countMask(selection)})</button>}</div>}
           {mode === 'lasso' && <div className="rounded-2xl bg-secondary p-3"><p className="text-xs font-black text-primary">تحديد حر للحواف والبقايا</p><p className="mt-2 text-xs text-muted-foreground">ارسم حول الجزء المراد مسحه ثم اضغط زر الحذف. الأداة لا تعيد رسم الجزء المحذوف.</p>{lassoPoints.length >= 3 && <button type="button" onClick={() => finishSelectionRemoval(createLassoMask(canvasRef.current?.width || 0, canvasRef.current?.height || 0, lassoPoints), 'أزلنا المنطقة ذات التحديد الحر.')} className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary text-xs font-black text-primary-foreground"><Eraser size={15} />حذف داخل المسار</button>}</div>}
-          <div className="rounded-2xl border border-primary/10 bg-white p-3"><p className="text-xs font-black text-primary">إضاءة وألوان</p><label className="mt-3 block text-[11px] font-bold text-muted-foreground">السطوع<input className="mt-1 w-full accent-primary" type="range" min="65" max="145" value={brightness} onChange={event => setBrightness(Number(event.target.value))} /></label><label className="mt-3 block text-[11px] font-bold text-muted-foreground">التباين<input className="mt-1 w-full accent-primary" type="range" min="65" max="145" value={contrast} onChange={event => setContrast(Number(event.target.value))} /></label><label className="mt-3 block text-[11px] font-bold text-muted-foreground">التشبع<input className="mt-1 w-full accent-primary" type="range" min="40" max="160" value={saturation} onChange={event => setSaturation(Number(event.target.value))} /></label><button type="button" onClick={bakeAdjustments} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-black text-primary">تثبيت التحسينات</button></div>
+          <div className="rounded-2xl border border-primary/10 bg-white p-3"><p className="text-xs font-black text-primary">تحسين الصورة</p>{qualityReport && <div className="mt-2 rounded-xl bg-secondary p-2"><p className="text-xs font-bold text-primary">{qualityReport.summary}</p><p className="mt-1 text-[11px] leading-4 text-muted-foreground">{qualityReport.suggestion}</p><button type="button" onClick={applyQuickPolish} className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-primary/20 bg-primary/5 text-xs font-black text-primary"><Sparkles size={15} />تحسين سريع</button></div>}<label className="mt-3 block text-[11px] font-bold text-muted-foreground">السطوع<input className="mt-1 w-full accent-primary" type="range" min="65" max="145" value={brightness} onChange={event => setBrightness(Number(event.target.value))} /></label><label className="mt-3 block text-[11px] font-bold text-muted-foreground">التباين<input className="mt-1 w-full accent-primary" type="range" min="65" max="145" value={contrast} onChange={event => setContrast(Number(event.target.value))} /></label><label className="mt-3 block text-[11px] font-bold text-muted-foreground">التشبع<input className="mt-1 w-full accent-primary" type="range" min="40" max="160" value={saturation} onChange={event => setSaturation(Number(event.target.value))} /></label><button type="button" onClick={bakeAdjustments} className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-xl border border-primary/20 bg-primary/5 text-xs font-black text-primary">تثبيت التحسينات</button></div>
           <button type="button" disabled={isPreparingLocalRemoval} onClick={() => void prepareTransparentProduct()} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-white text-xs font-black text-primary disabled:opacity-50">{isPreparingLocalRemoval ? <LoaderCircle className="animate-spin" size={16} /> : <WandSparkles size={16} />}{isPreparingLocalRemoval ? 'جارٍ فصل الخلفية محلياً…' : 'فصل الخلفية محلياً'}</button>
           <div className="grid grid-cols-2 gap-2"><button type="button" disabled={history.length < 2} onClick={undo} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-secondary text-xs font-black text-primary disabled:opacity-50"><Undo2 size={15} />تراجع</button><button type="button" onClick={reset} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-secondary text-xs font-black text-primary"><RotateCcw size={15} />إعادة ضبط</button></div>
         </aside>

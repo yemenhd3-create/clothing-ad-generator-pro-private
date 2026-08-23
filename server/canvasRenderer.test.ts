@@ -167,6 +167,26 @@ describe('Canvas advertisement renderer', () => {
     expect(context.__createRadialGradient).toHaveBeenCalledTimes(2);
   });
 
+  it('يرسم الخلفيتين الوردي والرملي محلياً مع استمرار وضع الظل والقطعة نفسه', async () => {
+    for (const productBackdrop of ['rose', 'sand'] as const) {
+      context.__createRadialGradient.mockClear();
+      context.__drawImage.mockClear();
+      await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productBackdrop, productShadow: 'grounded' }, 'blob:garment-image', { width: 1080, height: 1350 });
+      expect(context.__createRadialGradient).toHaveBeenCalledTimes(2);
+      expect(context.__drawImage.mock.calls.at(-1)?.[7]).toBeGreaterThan(160);
+    }
+  });
+
+  it('يضيف البروز البصري الاختياري خلف قطعة الملابس فقط ولا يبدل موضع المنتج الأمامي', async () => {
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'flat' }, 'blob:garment-image', { width: 1080, height: 1350 });
+    const flatCall = context.__drawImage.mock.calls.at(-1);
+    context.__drawImage.mockClear();
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'lifted' }, 'blob:garment-image', { width: 1080, height: 1350 });
+    const liftedFrontCall = context.__drawImage.mock.calls.at(-1);
+    expect(context.__drawImage).toHaveBeenCalledTimes(2);
+    expect(liftedFrontCall?.slice(1)).toEqual(flatCall?.slice(1));
+  });
+
   it('يعطي قالب غرفة الملابس الافتراضي مساحة استديو كبيرة للقطعة من دون نص أو شارات افتراضية', async () => {
     await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:garment-image', { width: 1080, height: 1350 });
     const garmentCall = context.__drawImage.mock.calls.at(-1);
