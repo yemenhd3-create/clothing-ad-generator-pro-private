@@ -1,6 +1,6 @@
 import { AlertTriangle, BadgeCheck, Camera, ImageUp, LoaderCircle, ScanLine, Upload, X } from 'lucide-react';
 import * as React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { prepareSelectedFile, readImageWithFallback } from '@/lib/imageUploadFlow';
 import { getCameraCaptureErrorMessage, getImagePreparationErrorMessage } from '@/lib/imageUploadSupport';
 import GarmentCropEditor from './GarmentCropEditor';
@@ -17,9 +17,11 @@ export default function ImageUploader({
   currentImage,
   onImageRemove,
 }: ImageUploaderProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
+  const inputId = useId();
+  const galleryInputId = `garment-gallery-${inputId}`;
+  const cameraInputId = `garment-camera-${inputId}`;
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -199,14 +201,10 @@ export default function ImageUploader({
           )}
 
           {/* Change Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground shadow-sm transition active:scale-95"
-          >
+          <label htmlFor={galleryInputId} role="button" className="absolute bottom-3 left-3 flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground shadow-sm transition active:scale-95">
             <Upload size={18} />
             تغيير الصورة
-          </button>
+          </label>
         </div>
       ) : (
         /* Upload Area */
@@ -232,41 +230,32 @@ export default function ImageUploader({
           {errorMessage && <div role="alert" className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-sm font-medium leading-6 text-red-800"><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><p>{errorMessage}</p></div><button type="button" onClick={() => void startCamera()} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-black text-red-800 shadow-sm" disabled={isLoading || isCameraStarting}><Camera size={14} />جرّب التقاط صورة الآن</button></div>}
 
           <div className="mx-auto grid max-w-xs grid-cols-2 gap-3">
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isLoading}
-              className="reference-primary min-h-14 w-full"
-            >
+            <label htmlFor={galleryInputId} role="button" aria-disabled={isLoading} onClick={event => { if (isLoading) event.preventDefault(); }} className={`reference-primary flex min-h-14 w-full items-center justify-center gap-2 ${isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
               <ImageUp size={17} /> {isLoading ? 'جارٍ التحميل…' : 'من المعرض'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void startCamera()}
-              disabled={isLoading || isCameraStarting}
-              className="reference-outline min-h-14 w-full"
-            >
-              <Camera size={17} /> {isCameraStarting ? 'جارٍ فتح الكاميرا…' : 'بالكاميرا'}
-            </Button>
+            </label>
+            <label htmlFor={cameraInputId} role="button" aria-disabled={isLoading || isCameraStarting} onClick={event => { if (isLoading || isCameraStarting) event.preventDefault(); }} className={`reference-outline flex min-h-14 w-full items-center justify-center gap-2 ${isLoading || isCameraStarting ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}>
+              <Camera size={17} />بالكاميرا
+            </label>
           </div>
         </div>
       )}
 
       {/* Hidden File Input */}
       <input
-        ref={fileInputRef}
+        id={galleryInputId}
         type="file"
         accept="image/*,.heic,.heif,.avif,.gif,.bmp"
         onChange={handleFileInputChange}
-        className="hidden"
+        className="sr-only"
       />
       <input
+        id={cameraInputId}
         ref={cameraInputRef}
         type="file"
         accept="image/*,.heic,.heif,.avif,.gif,.bmp"
         capture="environment"
         onChange={handleFileInputChange}
-        className="hidden"
+        className="sr-only"
       />
 
       {cameraStream && (

@@ -52,19 +52,16 @@ describe('ImageUploader على هاتف Android', () => {
     await waitFor(() => expect(cameraClick).toHaveBeenCalledOnce());
   });
 
-  it('يفتح معاينة كاميرا مباشرة قبل التقاط الصورة عندما يدعمها الهاتف', async () => {
-    const getUserMedia = vi.fn().mockResolvedValue({ getTracks: () => [] } satisfies Pick<MediaStream, 'getTracks'>);
-    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', { configurable: true, value: vi.fn().mockResolvedValue(undefined) });
+  it('يربط زري المعرض والكاميرا بمدخلي ملفات أصليين لفتح الاختيار من لمسة مباشرة', () => {
+    const { container } = render(<ImageUploader onImageSelect={vi.fn()} />);
+    const galleryInput = container.querySelector<HTMLInputElement>('input[type="file"]:not([capture])');
+    const cameraInput = container.querySelector<HTMLInputElement>('input[capture="environment"]');
+    const galleryButton = screen.getByRole('button', { name: 'من المعرض' });
+    const cameraButton = screen.getByRole('button', { name: 'بالكاميرا' });
 
-    render(<ImageUploader onImageSelect={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'بالكاميرا' }));
-
-    await waitFor(() => expect(getUserMedia).toHaveBeenCalledWith({
-      audio: false,
-      video: { facingMode: { ideal: 'environment' } },
-    }));
-    expect(await screen.findByRole('dialog', { name: 'التقاط صورة الملابس بالكاميرا' })).toBeTruthy();
+    expect(galleryButton.getAttribute('for')).toBe(galleryInput?.id);
+    expect(cameraButton.getAttribute('for')).toBe(cameraInput?.id);
+    expect(cameraInput?.getAttribute('capture')).toBe('environment');
   });
 
   it('يقبل صورة معرض مجهولة النوع أو HEIC بالاسم ويستبعد الملفات غير الصورية', () => {
