@@ -187,14 +187,17 @@ describe('Canvas advertisement renderer', () => {
     }
   });
 
-  it('يضيف البروز البصري الاختياري خلف قطعة الملابس فقط ولا يبدل موضع المنتج الأمامي', async () => {
+  it('يضيف البروز البصري الاختياري خلف قطعة الملابس ويرفعها بوضوح من دون تغيير عرضها أو ارتفاعها', async () => {
     await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'flat' }, 'blob:garment-image', { width: 1080, height: 1350 });
     const flatCall = context.__drawImage.mock.calls.at(-1);
     context.__drawImage.mockClear();
     await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'lifted' }, 'blob:garment-image', { width: 1080, height: 1350 });
     const liftedFrontCall = context.__drawImage.mock.calls.at(-1);
-    expect(context.__drawImage).toHaveBeenCalledTimes(2);
-    expect(liftedFrontCall?.slice(1)).toEqual(flatCall?.slice(1));
+    expect(context.__drawImage).toHaveBeenCalledTimes(3);
+    expect(liftedFrontCall?.[5]).toBe(flatCall?.[5]);
+    expect(liftedFrontCall?.[6]).toBeLessThan(flatCall?.[6] ?? Number.POSITIVE_INFINITY);
+    expect(liftedFrontCall?.[7]).toBe(flatCall?.[7]);
+    expect(liftedFrontCall?.[8]).toBe(flatCall?.[8]);
   });
 
   it('يرسم خيار المنصة خلف القطعة من دون تغيير رسم القطعة الأمامي', async () => {

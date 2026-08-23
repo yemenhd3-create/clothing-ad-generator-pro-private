@@ -208,21 +208,33 @@ async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Bo
   const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(1.16, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
   ctx.save();
   ctx.beginPath(); ctx.rect(safeBox.x, safeBox.y, safeBox.width, safeBox.height); ctx.clip();
+  const isLifted = visualMode === 'garment' && presentation === 'lifted';
+  const elevation = isLifted ? Math.max(8, Math.round(Math.min(placement.width, placement.height) * .024)) : 0;
+  const foregroundPlacement = isLifted ? { ...placement, y: placement.y - elevation } : placement;
   if (visualMode === 'garment' && presentation === 'platform') drawProductPlatform(ctx, placement);
-  if (visualMode === 'garment' && presentation === 'lifted') drawProductLift(ctx, image, sourceBounds, placement);
-  drawProductShadow(ctx, placement, shadow);
+  if (isLifted) drawProductLift(ctx, image, sourceBounds, foregroundPlacement, elevation);
+  drawProductShadow(ctx, isLifted ? { ...placement, y: placement.y + elevation * .32 } : placement, shadow);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, sourceBounds.x, sourceBounds.y, sourceBounds.width, sourceBounds.height, placement.x, placement.y, placement.width, placement.height);
+  ctx.drawImage(image, sourceBounds.x, sourceBounds.y, sourceBounds.width, sourceBounds.height, foregroundPlacement.x, foregroundPlacement.y, foregroundPlacement.width, foregroundPlacement.height);
   ctx.restore();
 }
 
-/** طبقة خلفية شفافة خفيفة ترفع القطعة بصرياً؛ تبقى القطعة الأصلية مرسومة فوقها بلا تعديل. */
-function drawProductLift(ctx: CanvasRenderingContext2D, image: HTMLImageElement, source: ImageSourceBounds, box: Box) {
-  const offset = Math.max(2, Math.round(Math.min(box.width, box.height) * .012));
+/** ظل طبقي وهالة لطيفة يبرزان ارتفاع القطعة من دون تغيير أي بكسل من صورتها الأصلية. */
+function drawProductLift(ctx: CanvasRenderingContext2D, image: HTMLImageElement, source: ImageSourceBounds, box: Box, elevation: number) {
+  const softeningPixels = Math.max(5, Math.round(elevation * .85));
   ctx.save();
-  ctx.globalAlpha = .10;
-  (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = `blur(${Math.max(1, Math.round(offset * .6))}px)`;
-  ctx.drawImage(image, source.x, source.y, source.width, source.height, box.x + offset, box.y + offset * 1.3, box.width, box.height);
+  ctx.globalAlpha = .30;
+  ctx.shadowColor = 'rgba(50,36,96,.54)';
+  ctx.shadowBlur = softeningPixels;
+  ctx.shadowOffsetY = Math.max(7, Math.round(elevation * 1.45));
+  (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = `blur(${Math.max(2, Math.round(softeningPixels * .55))}px)`;
+  ctx.drawImage(image, source.x, source.y, source.width, source.height, box.x, box.y, box.width, box.height);
+  ctx.globalAlpha = .12;
+  ctx.shadowColor = 'rgba(255,255,255,.98)';
+  ctx.shadowBlur = Math.max(4, Math.round(softeningPixels * .65));
+  ctx.shadowOffsetY = 0;
+  (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = 'none';
+  ctx.drawImage(image, source.x, source.y, source.width, source.height, box.x, box.y, box.width, box.height);
   ctx.restore();
 }
 
