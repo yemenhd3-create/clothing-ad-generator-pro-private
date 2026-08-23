@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeImageQuality, getQuickPolishSettings } from '../client/src/lib/imageQuickPolish';
+import { analyzeImageQuality, cleanTransparentEdges, getQuickPolishSettings } from '../client/src/lib/imageQuickPolish';
 
 function pixels(values: Array<[number, number, number, number]>) {
   return new Uint8ClampedArray(values.flat());
@@ -35,5 +35,30 @@ describe('local quick polish', () => {
     const settings = getQuickPolishSettings(report);
     expect(settings.brightness).toBeLessThanOrEqual(101);
     expect(settings.contrast).toBeLessThanOrEqual(102);
+  });
+
+  it('يعرض تنبيهاً غير معيق عندما تكون أبعاد الصورة صغيرة', () => {
+    const tiny = new Uint8ClampedArray(320 * 320 * 4).fill(160);
+    expect(analyzeImageQuality(tiny, 320, 320).detailNotice).toContain('دقة الصورة صغيرة');
+  });
+
+  it('يخفف شفافية هالة محاطة بخلفية شفافة من دون تغيير لونها', () => {
+    const source = pixels([
+      [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0],
+      [0, 0, 0, 0], [200, 40, 20, 80], [0, 0, 0, 0],
+      [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0],
+    ]);
+    const cleaned = cleanTransparentEdges(source, 3, 3);
+    expect(cleaned.slice(16, 19)).toEqual(source.slice(16, 19));
+    expect(cleaned[19]).toBeLessThan(80);
+  });
+
+  it('لا يلمس البكسلات المعتمة في نسيج القطعة', () => {
+    const source = pixels([
+      [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0],
+      [0, 0, 0, 0], [30, 90, 180, 255], [0, 0, 0, 0],
+      [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0],
+    ]);
+    expect(cleanTransparentEdges(source, 3, 3)).toEqual(source);
   });
 });

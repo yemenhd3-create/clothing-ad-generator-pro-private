@@ -187,6 +187,17 @@ describe('Canvas advertisement renderer', () => {
     expect(liftedFrontCall?.slice(1)).toEqual(flatCall?.slice(1));
   });
 
+  it('يرسم خيار المنصة خلف القطعة من دون تغيير رسم القطعة الأمامي', async () => {
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'flat' }, 'blob:garment-image', { width: 1080, height: 1350 });
+    const flatCall = context.__drawImage.mock.calls.at(-1);
+    const flatStrokes = context.__stroke.mock.calls.length;
+    context.__drawImage.mockClear();
+    context.__stroke.mockClear();
+    await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'platform' }, 'blob:garment-image', { width: 1080, height: 1350 });
+    expect(context.__stroke.mock.calls.length).toBeGreaterThan(flatStrokes);
+    expect(context.__drawImage.mock.calls.at(-1)?.slice(1)).toEqual(flatCall?.slice(1));
+  });
+
   it('يعطي قالب غرفة الملابس الافتراضي مساحة استديو كبيرة للقطعة من دون نص أو شارات افتراضية', async () => {
     await renderAd(DEFAULT_AD_DETAILS, DEFAULT_TEMPLATE_SETTINGS, 'blob:garment-image', { width: 1080, height: 1350 });
     const garmentCall = context.__drawImage.mock.calls.at(-1);

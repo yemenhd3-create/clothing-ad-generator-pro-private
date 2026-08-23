@@ -205,7 +205,7 @@ export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlig
 /** ظل هندسي محلي يوضع أسفل المنتج الشفاف داخل مساحة البطل. */
 export type ProductShadowPreset = 'none' | 'soft' | 'grounded';
 /** بروز بصري محلي خفيف؛ ليس نموذج 3D ولا ينشئ زوايا أو محتوى جديداً. */
-export type ProductPresentationEffect = 'flat' | 'lifted';
+export type ProductPresentationEffect = 'flat' | 'lifted' | 'platform';
 /** موضع نسبي داخل قالب غرفة الملابس لطبقة نص اختيارية. */
 export interface StudioOverlayPosition { x: number; y: number; }
 export type ArtworkLayerKey = 'header' | 'footer' | 'logo';

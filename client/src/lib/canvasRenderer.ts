@@ -198,6 +198,7 @@ async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Bo
   const placement = calculateImagePlacement(sourceBounds, selected, visualMode, studioOnly ? Math.min(1.16, normalizeProductScale(productScale)) : normalizeProductScale(productScale));
   ctx.save();
   ctx.beginPath(); ctx.rect(safeBox.x, safeBox.y, safeBox.width, safeBox.height); ctx.clip();
+  if (visualMode === 'garment' && presentation === 'platform') drawProductPlatform(ctx, placement);
   if (visualMode === 'garment' && presentation === 'lifted') drawProductLift(ctx, image, sourceBounds, placement);
   drawProductShadow(ctx, placement, shadow);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
@@ -212,6 +213,23 @@ function drawProductLift(ctx: CanvasRenderingContext2D, image: HTMLImageElement,
   ctx.globalAlpha = .10;
   (ctx as unknown as Record<string, string>)[CANVAS_EFFECT_PROPERTY] = `blur(${Math.max(1, Math.round(offset * .6))}px)`;
   ctx.drawImage(image, source.x, source.y, source.width, source.height, box.x + offset, box.y + offset * 1.3, box.width, box.height);
+  ctx.restore();
+}
+
+/** منصة هندسية خلف القطعة فقط؛ لا تغير البكسلات أو تدّعي عمقاً حقيقياً. */
+function drawProductPlatform(ctx: CanvasRenderingContext2D, box: Box) {
+  const width = box.width * .66;
+  const height = Math.max(10, box.height * .065);
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height * .965;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,.52)';
+  ctx.strokeStyle = 'rgba(43,37,72,.15)';
+  ctx.lineWidth = Math.max(1, Math.round(Math.min(box.width, box.height) * .004));
+  ctx.beginPath();
+  ctx.ellipse(centerX, centerY, width / 2, height, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
