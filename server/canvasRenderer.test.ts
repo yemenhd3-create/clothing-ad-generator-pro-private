@@ -185,4 +185,17 @@ describe('Canvas advertisement renderer', () => {
     expect(context.__fillStyles).toContain('#ff5757');
     expect(context.__fillStyles).toContain('#ffe600');
   });
+
+  it('يعيد وضع السعر في القالب عند تغيير إحداثياته من أزرار الحركة', async () => {
+    const base = { ...DEFAULT_TEMPLATE_SETTINGS, studioPrice: '5000' };
+    await renderAd(DEFAULT_AD_DETAILS, { ...base, studioPricePosition: { x: .78, y: .89 } }, 'blob:garment-image', { width: 1080, height: 1350 });
+    const initial = context.__fillText.mock.calls.find(call => call[0] === '5000');
+    context.__fillText.mockClear();
+
+    await renderAd(DEFAULT_AD_DETAILS, { ...base, studioPricePosition: { x: .70, y: .81 } }, 'blob:garment-image', { width: 1080, height: 1350 });
+    const moved = context.__fillText.mock.calls.find(call => call[0] === '5000');
+
+    expect(moved?.[1]).toBeLessThan(initial?.[1] ?? Number.POSITIVE_INFINITY);
+    expect(moved?.[2]).toBeLessThan(initial?.[2] ?? Number.POSITIVE_INFINITY);
+  });
 });
