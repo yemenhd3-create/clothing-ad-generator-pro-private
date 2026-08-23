@@ -34,6 +34,7 @@ export type MerchantProfile = {
   storeCategory: string;
   preferredTheme?: TemplateVisualTheme;
   preferredProductScale?: number;
+  marketingPreferences?: Partial<MarketingTextPreferences>;
   defaultColors: string[];
   hiddenElements: MerchantVisibilityElement[];
   appliedCommandCount: number;
@@ -127,12 +128,16 @@ function normalizeMarketingPreferences(value: unknown): Partial<MarketingTextPre
     length: source.length as MarketingTextPreferences['length'],
     goal: source.goal as MarketingTextPreferences['goal'],
     format: source.format as MarketingTextPreferences['format'],
+    campaign: source.campaign as MarketingTextPreferences['campaign'],
+    emphasis: source.emphasis as MarketingTextPreferences['emphasis'],
   });
   return {
     ...(source.tone === resolved.tone ? { tone: resolved.tone } : {}),
     ...(source.length === resolved.length ? { length: resolved.length } : {}),
     ...(source.goal === resolved.goal ? { goal: resolved.goal } : {}),
     ...(source.format === resolved.format ? { format: resolved.format } : {}),
+    ...(source.campaign === resolved.campaign ? { campaign: resolved.campaign } : {}),
+    ...(source.emphasis === resolved.emphasis ? { emphasis: resolved.emphasis } : {}),
   };
 }
 
@@ -186,6 +191,7 @@ export function normalizeMerchantProfile(value: unknown): MerchantProfile {
     storeCategory: cleanText(source.storeCategory, 48),
     preferredTheme: theme,
     preferredProductScale: Number.isFinite(scale) ? Math.min(PRODUCT_SCALE_MAX, Math.max(PRODUCT_SCALE_MIN, scale)) : undefined,
+    marketingPreferences: normalizeMarketingPreferences(source.marketingPreferences),
     defaultColors: uniqueColors(source.defaultColors),
     hiddenElements: Array.from(new Set(hiddenElements)),
     appliedCommandCount: boundedCount(source.appliedCommandCount),

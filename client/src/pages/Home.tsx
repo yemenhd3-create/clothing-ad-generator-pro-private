@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
-import type { AdDetails, AdWorkflowStep, DesignSuggestion, StudioOverlayPosition, TemplateSettings, TemplateSize, TryOnResult } from '@shared/types';
+import type { AdDetails, AdWorkflowStep, DesignSuggestion, MarketingTextCampaign, MarketingTextEmphasis, MarketingTextLength, MarketingTextPreferences, StudioOverlayPosition, TemplateSettings, TemplateSize, TryOnResult } from '@shared/types';
 import {
   DEFAULT_AD_DETAILS,
   DEFAULT_PRODUCT_SCALE,
@@ -14,6 +14,7 @@ import {
   buildMarketingText,
   getCanvasDimensions,
 } from '@shared/adWorkflow';
+import { DEFAULT_MARKETING_TEXT_PREFERENCES, MARKETING_TEXT_CAMPAIGN_LABELS, MARKETING_TEXT_EMPHASIS_LABELS, generateLocalMarketingText, resolveMarketingTextPreferences } from '@shared/marketingText';
 import ImageUploader from '@/components/ImageUploader';
 import { TryOnOptIn, type TryOnSelection } from '@/components/TryOnOptIn';
 import LocalDesignSuggestionCard from '@/components/LocalDesignSuggestionCard';
@@ -51,6 +52,7 @@ import {
   Images,
   LoaderCircle,
   MessageCircle,
+  MessageSquareText,
   Palette,
   Pencil,
   RotateCcw,
@@ -116,7 +118,7 @@ function isWorkflowStep(value: string | null): value is AdWorkflowStep {
 type MainApplicationSection = 'create' | 'batch' | 'assistant' | 'settings';
 type ActiveView = MainApplicationSection | 'about' | 'developer' | 'messages';
 type VisualRepairStatus = 'idle' | 'repairing' | 'verified' | 'blocked' | 'failed' | 'undone';
-type WardrobeTool = 'backdrop' | 'shadow' | 'size' | 'format' | 'overlay' | 'refine' | null;
+type WardrobeTool = 'backdrop' | 'shadow' | 'size' | 'format' | 'overlay' | 'marketing' | 'refine' | null;
 type VisualRepairSnapshot = {
   templateSettings: TemplateSettings;
   generatedAdBlob: Blob;
@@ -669,6 +671,43 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     if (generatedAd) void regenerateWithCurrentSettings(updatedTemplate, 'تم تحديث الاستديو محلياً.');
   };
 
+  const handleMarketingDetailsChange = (patch: Partial<AdDetails>) => {
+    setAdDetails(current => ({ ...current, ...patch }));
+    if (typeof patch.marketingText === 'string') setMarketingText(patch.marketingText);
+    if ((typeof patch.storePhone === 'string' && patch.storePhone.trim()) || patch.marketingPreferences) {
+      const stored = saveMerchantProfile({
+        ...merchantProfile,
+        ...(typeof patch.storePhone === 'string' && patch.storePhone.trim() ? { storePhone: patch.storePhone.trim() } : {}),
+        ...(patch.marketingPreferences ? { marketingPreferences: patch.marketingPreferences } : {}),
+      });
+      setMerchantProfile(stored);
+    }
+  };
+
+  const generateWardrobeMarketingText = async (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => {
+    const caption = templateSettings.studioCaption?.trim() || '';
+    const generationDetails: AdDetails = {
+      ...details,
+      headline: [details.headline.trim(), caption].filter((value, index, values) => Boolean(value) && values.indexOf(value) === index).join(' — '),
+      currency: details.currency.trim() || 'ريال',
+      marketingText: '',
+    };
+    if (friendTestMode || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      const local = generateLocalMarketingText(generationDetails, preferences, variant);
+      handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
+      return { ...local, source: 'local-fallback' as const, message: friendTestMode ? 'وضع الاختبار يستخدم المولد المحلي فوراً.' : 'لا يوجد اتصال، فاستخدمنا المولد المحلي فوراً.' };
+    }
+    try {
+      const result = await marketingTextMutation.mutateAsync({ details: generationDetails, preferences, variant });
+      handleMarketingDetailsChange({ marketingText: result.text, marketingPreferences: preferences, marketingTextEngine: result.source === 'cloud' ? 'cloud' : 'local' });
+      return result;
+    } catch {
+      const local = generateLocalMarketingText(generationDetails, preferences, variant);
+      handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
+      return { ...local, source: 'local-fallback' as const, message: 'تعذر الاتصال، فاستخدمنا المولد المحلي فوراً.' };
+    }
+  };
+
   const handleWardrobeWorkspacePointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (!activeWardrobeTool) return;
     if ((event.target as HTMLElement).closest('[data-wardrobe-tool-panel]')) return;
@@ -1217,7 +1256,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   <div className="relative flex min-h-0 flex-1 flex-col" aria-label="القالب ثابت وأدوات عائمة" onPointerDown={handleWardrobeWorkspacePointerDown}>
                     <div className="flex items-center justify-between gap-2 px-1 pb-3"><h2 className="text-sm font-black text-primary">غرفة الملابس</h2><span className="text-xs font-bold text-muted-foreground">اضغط أداة للتعديل</span></div>
                     <div className="flex min-h-0 flex-1 items-center justify-center"><img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto w-full rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: 'calc(100svh - 15rem)' }} /></div>
-                    {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} settings={templateSettings} disabled={isGenerating} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
+                    {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} settings={templateSettings} details={adDetails} savedMarketingPreferences={merchantProfile.marketingPreferences} disabled={isGenerating} isMarketingGenerating={marketingTextMutation.isPending} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onMarketingChange={handleMarketingDetailsChange} onGenerateMarketing={generateWardrobeMarketingText} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
                     <WardrobeToolBar activeTool={activeWardrobeTool} onTool={tool => setActiveWardrobeTool(current => current === tool ? null : tool)} onDownload={handleDownload} onShare={() => void handleShare()} />
                   </div>
                 </div>
@@ -1299,23 +1338,54 @@ function WardrobeToolBar({ activeTool, onTool, onDownload, onShare }: { activeTo
     { id: 'size', label: 'الحجم', icon: <SlidersHorizontal size={18} /> },
     { id: 'format', label: 'المقاسات', icon: <Maximize2 size={18} /> },
     { id: 'overlay', label: 'نص وسعر', icon: <Pencil size={18} /> },
+    { id: 'marketing', label: 'نص تسويقي', icon: <MessageSquareText size={18} /> },
     { id: 'refine', label: 'تعديل الصورة', icon: <Wand2 size={18} /> },
   ];
   return <div className="shrink-0 border-t border-primary/10 bg-white pt-3"><div className="flex gap-1 pb-1" dir="rtl" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>{tools.map(tool => <button key={tool.id} type="button" aria-pressed={activeTool === tool.id} onClick={() => onTool(tool.id)} className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-black ${activeTool === tool.id ? 'bg-primary text-primary-foreground' : 'text-primary'}`} style={{ width: 68, flexShrink: 0, scrollSnapAlign: 'start' }}>{tool.icon}<span>{tool.label}</span></button>)}</div><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={onDownload} className="reference-primary w-full"><Send size={16} />تنزيل</button><button type="button" onClick={onShare} className="reference-outline w-full"><MessageCircle size={16} />مشاركة</button></div></div>;
 }
 
-function WardrobeToolPanel({ tool, settings, disabled, onClose, onChange, onScaleCommit, onRefine }: { tool: Exclude<WardrobeTool, null>; settings: TemplateSettings; disabled: boolean; onClose: () => void; onChange: (patch: StudioAppearancePatch) => void; onScaleCommit: (value: number) => void; onRefine: () => void }) {
+function WardrobeToolPanel({ tool, settings, details, savedMarketingPreferences, disabled, isMarketingGenerating, onClose, onChange, onMarketingChange, onGenerateMarketing, onScaleCommit, onRefine }: { tool: Exclude<WardrobeTool, null>; settings: TemplateSettings; details: AdDetails; savedMarketingPreferences?: Partial<MarketingTextPreferences>; disabled: boolean; isMarketingGenerating: boolean; onClose: () => void; onChange: (patch: StudioAppearancePatch) => void; onMarketingChange: (patch: Partial<AdDetails>) => void; onGenerateMarketing: (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => Promise<{ text: string; source: string; message?: string }>; onScaleCommit: (value: number) => void; onRefine: () => void }) {
   const backdrops: Array<{ id: NonNullable<TemplateSettings['productBackdrop']>; label: string }> = [{ id: 'soft', label: 'نظيف' }, { id: 'warm', label: 'دافئ' }, { id: 'cool', label: 'بارد' }, { id: 'spotlight', label: 'إضاءة' }];
   const shadows: Array<{ id: NonNullable<TemplateSettings['productShadow']>; label: string }> = [{ id: 'none', label: 'بلا ظل' }, { id: 'soft', label: 'ناعم' }, { id: 'grounded', label: 'أرضي' }];
   const [overlayLayer, setOverlayLayer] = useState<'caption' | 'price'>('caption');
   const currentScale = clampProductScale(settings.productScale);
-  const title = tool === 'backdrop' ? 'خلفية القالب' : tool === 'shadow' ? 'ظل تحت المنتج' : tool === 'size' ? 'حجم المنتج' : tool === 'format' ? 'مقاسات القالب' : tool === 'overlay' ? 'نص وسعر' : 'تعديل الصورة';
+  const title = tool === 'backdrop' ? 'خلفية القالب' : tool === 'shadow' ? 'ظل تحت المنتج' : tool === 'size' ? 'حجم المنتج' : tool === 'format' ? 'مقاسات القالب' : tool === 'overlay' ? 'نص وسعر' : tool === 'marketing' ? 'نص تسويقي' : 'تعديل الصورة';
   const panelPosition = tool === 'overlay' && overlayLayer === 'price' ? { top: 44, left: 12, right: 12 } : { bottom: 96, left: 12, right: 12 };
-  return <section data-wardrobe-tool-panel className="absolute z-20 rounded-2xl border border-primary/15 bg-white p-2 shadow-xl" style={panelPosition} aria-label={title}><div className="mb-1 flex items-center justify-between"><h3 className="text-sm font-black text-primary">{title}</h3><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-primary">إغلاق</button></div>{tool === 'backdrop' && <div className="grid grid-cols-4 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'shadow' && <div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'format' && <WardrobeSizePicker selected={settings.size} disabled={disabled} onSelect={size => onChange({ size })} />}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onClose={onClose} onLayerChange={setOverlayLayer} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">افتح الممحاة والعصا والتحديد الحر لتعديل الحواف محلياً، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="reference-primary mt-2 w-full"><Wand2 size={17} />فتح تعديل الصورة</button></div>}</section>;
+  return <section data-wardrobe-tool-panel className="absolute z-20 rounded-2xl border border-primary/15 bg-white p-2 shadow-xl" style={panelPosition} aria-label={title}><div className="mb-1 flex items-center justify-between"><h3 className="text-sm font-black text-primary">{title}</h3><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-primary">إغلاق</button></div>{tool === 'backdrop' && <div className="grid grid-cols-4 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'shadow' && <div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'format' && <WardrobeSizePicker selected={settings.size} disabled={disabled} onSelect={size => onChange({ size })} />}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onClose={onClose} onLayerChange={setOverlayLayer} />}{tool === 'marketing' && <WardrobeMarketingTextTool details={details} savedPreferences={savedMarketingPreferences} disabled={disabled} isGenerating={isMarketingGenerating} onChange={onMarketingChange} onGenerate={onGenerateMarketing} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">افتح الممحاة والعصا والتحديد الحر لتعديل الحواف محلياً، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="reference-primary mt-2 w-full"><Wand2 size={17} />فتح تعديل الصورة</button></div>}</section>;
 }
 
 function WardrobeSizePicker({ selected, disabled, onSelect }: { selected: TemplateSize; disabled: boolean; onSelect: (size: TemplateSize) => void }) {
   return <div><p className="mb-2 text-[11px] font-bold text-muted-foreground">اسحب الشريط يميناً أو شمالاً، ثم اختر نسبة واحدة للقالب.</p><div className="flex gap-2 pb-1" dir="rtl" aria-label="نسب مقاسات القالب" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>{WARDROBE_SIZE_OPTIONS.map(option => <button key={option.id} type="button" disabled={disabled} aria-pressed={selected === option.id} onClick={() => onSelect(option.id)} className={`rounded-xl px-4 py-3 text-center text-xs font-black ${selected === option.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`} style={{ minWidth: 88, flexShrink: 0, scrollSnapAlign: 'start' }}><span className="block text-base leading-none">{option.ratio}</span><span className="mt-1 block text-[10px]">{option.label}</span></button>)}</div></div>;
+}
+
+function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGenerating, onChange, onGenerate }: { details: AdDetails; savedPreferences?: Partial<MarketingTextPreferences>; disabled: boolean; isGenerating: boolean; onChange: (patch: Partial<AdDetails>) => void; onGenerate: (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => Promise<{ text: string; source: string; message?: string }> }) {
+  const [variant, setVariant] = useState(0);
+  const [notice, setNotice] = useState('اكتب ما تريد فقط؛ السعر هنا يذهب إلى رسالة واتساب ولا يظهر في القالب.');
+  const [showPreview, setShowPreview] = useState(false);
+  const preferences = resolveMarketingTextPreferences({ ...DEFAULT_MARKETING_TEXT_PREFERENCES, ...details.marketingPreferences, ...savedPreferences });
+  const updatePreferences = (patch: Partial<MarketingTextPreferences>) => onChange({ marketingPreferences: { ...preferences, ...patch } });
+  const updateDetails = (patch: Partial<AdDetails>) => onChange(patch);
+  const generate = async () => {
+    const nextVariant = variant + 1;
+    setVariant(nextVariant);
+    const result = await onGenerate({ ...details, marketingPreferences: preferences }, preferences, nextVariant);
+    setNotice(result.message || (result.source === 'cloud' ? 'تم تجهيز النص عبر أول نموذج متصل صالح.' : 'تم تجهيز النص محلياً على الهاتف.'));
+    setShowPreview(true);
+  };
+  const copy = async () => {
+    if (!details.marketingText.trim()) return;
+    try {
+      await navigator.clipboard.writeText(details.marketingText);
+      setNotice('تم نسخ النص. افتح واتساب والصقه بجانب الصورة.');
+    } catch {
+      setNotice('حدّد النص وانسخه يدوياً؛ المتصفح لم يسمح بالنسخ التلقائي.');
+    }
+  };
+  const campaignOptions = Object.entries(MARKETING_TEXT_CAMPAIGN_LABELS) as Array<[MarketingTextCampaign, string]>;
+  const lengthOptions: Array<[MarketingTextLength, string]> = [['short', 'أساسي'], ['medium', 'متوسط'], ['long', 'كبير']];
+  const emphasisOptions = Object.entries(MARKETING_TEXT_EMPHASIS_LABELS) as Array<[MarketingTextEmphasis, string]>;
+
+  return <div><p className="mb-2 text-[11px] font-bold text-muted-foreground">رسالة واتساب منفصلة؛ لا تضيف السعر أو النص إلى الصورة.</p><div className="grid grid-cols-2 gap-2"><input value={details.productName} disabled={disabled} onChange={event => updateDetails({ productName: event.target.value })} placeholder="اسم القطعة" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="اسم القطعة للنص التسويقي" /><input value={details.price} disabled={disabled} inputMode="numeric" onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })} placeholder="السعر 5000" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="السعر للنص التسويقي" /></div><details className="mt-2 rounded-xl bg-secondary/70 px-3 py-2"><summary className="cursor-pointer text-xs font-black text-primary">بيانات اختيارية</summary><div className="mt-2 grid grid-cols-3 gap-2"><input value={details.quantity} disabled={disabled} onChange={event => updateDetails({ quantity: event.target.value })} placeholder="الكمية" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الكمية المتاحة" /><input value={details.discount} disabled={disabled} inputMode="decimal" onChange={event => updateDetails({ discount: event.target.value })} placeholder="الخصم" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الخصم" /><input value={details.storePhone} disabled={disabled} inputMode="tel" onChange={event => updateDetails({ storePhone: event.target.value })} placeholder="رقم التوصيل" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="رقم التوصيل وواتساب" /></div></details><select value={preferences.campaign} disabled={disabled} onChange={event => updatePreferences({ campaign: event.target.value as MarketingTextCampaign })} className="mt-2 min-h-10 w-full rounded-xl border border-primary/10 bg-white px-3 text-xs font-black text-primary outline-none focus:border-primary" aria-label="أسلوب النص التسويقي">{campaignOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><div className="mt-2 grid grid-cols-3 gap-2">{lengthOptions.map(([id, label]) => <button key={id} type="button" disabled={disabled} onClick={() => updatePreferences({ length: id })} className={`rounded-xl px-2 py-2 text-xs font-black ${preferences.length === id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{label}</button>)}</div><div className="mt-2 grid grid-cols-3 gap-2">{emphasisOptions.map(([id, label]) => <button key={id} type="button" disabled={disabled} onClick={() => updatePreferences({ emphasis: id, format: 'whatsapp' })} className={`rounded-xl px-2 py-2 text-xs font-black ${preferences.emphasis === id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{label}</button>)}</div><button type="button" disabled={disabled || isGenerating} onClick={() => void generate()} className="reference-primary mt-2 w-full">{isGenerating ? <><LoaderCircle className="animate-spin" size={16} />جارٍ تجهيز النص…</> : <><MessageSquareText size={16} />تجهيز نص تسويقي</>}</button>{details.marketingText && <><div className="mt-2 flex gap-2"><button type="button" onClick={() => setShowPreview(value => !value)} className="flex-1 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">{showPreview ? 'إخفاء المعاينة' : 'معاينة'}</button><button type="button" onClick={() => void copy()} className="flex-1 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">نسخ لواتساب</button></div>{showPreview && <div className="mt-2 rounded-xl border border-primary/10 bg-primary/5 p-3"><p className="whitespace-pre-wrap text-right text-[11px] leading-5 text-foreground">{details.marketingText}</p></div>}<textarea value={details.marketingText} disabled={disabled} onChange={event => updateDetails({ marketingText: event.target.value })} className="mt-2 min-h-16 w-full rounded-xl border border-primary/10 p-2 text-right text-[11px] leading-5 text-foreground outline-none focus:border-primary" aria-label="تعديل النص التسويقي" /></>}<p className="mt-2 text-[10px] leading-4 text-muted-foreground" aria-live="polite">{notice}</p></div>;
 }
 
 function FloatingOverlayEditor({ settings, disabled, onChange, onClose, onLayerChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void; onClose: () => void; onLayerChange: (layer: 'caption' | 'price') => void }) {

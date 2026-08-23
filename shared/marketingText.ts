@@ -1,5 +1,7 @@
 import type {
   AdDetails,
+  MarketingTextCampaign,
+  MarketingTextEmphasis,
   MarketingTextFormat,
   MarketingTextGoal,
   MarketingTextLength,
@@ -12,6 +14,8 @@ export const DEFAULT_MARKETING_TEXT_PREFERENCES: MarketingTextPreferences = {
   length: 'medium',
   goal: 'purchase',
   format: 'whatsapp',
+  campaign: 'professional',
+  emphasis: 'featured',
 };
 
 export const MARKETING_TEXT_TONE_LABELS: Record<MarketingTextTone, string> = {
@@ -38,6 +42,23 @@ export const MARKETING_TEXT_FORMAT_LABELS: Record<MarketingTextFormat, string> =
   plain: 'نص بسيط',
 };
 
+export const MARKETING_TEXT_CAMPAIGN_LABELS: Record<MarketingTextCampaign, string> = {
+  professional: 'احترافي',
+  passion: 'شغف',
+  persuasive: 'إقناع',
+  'new-arrival': 'الجديد وصل',
+  'eid-fitr': 'عروض عيد الفطر',
+  'eid-adha': 'عروض عيد الأضحى',
+  festival: 'عروض المهرجان',
+  women: 'موجّه للنساء',
+};
+
+export const MARKETING_TEXT_EMPHASIS_LABELS: Record<MarketingTextEmphasis, string> = {
+  normal: 'عادي',
+  bold: 'عريض',
+  featured: 'مميز',
+};
+
 export type LocalMarketingTextResult = {
   text: string;
   source: 'local';
@@ -51,6 +72,8 @@ export function resolveMarketingTextPreferences(
   const tone = preferences?.tone;
   const length = preferences?.length;
   const goal = preferences?.goal;
+  const campaign = preferences?.campaign;
+  const emphasis = preferences?.emphasis;
   return {
     tone: tone === 'exciting' || tone === 'persuasive' || tone === 'formal' || tone === 'playful'
       ? tone
@@ -64,6 +87,12 @@ export function resolveMarketingTextPreferences(
     format: preferences?.format === 'whatsapp' || preferences?.format === 'plain'
       ? preferences.format
       : DEFAULT_MARKETING_TEXT_PREFERENCES.format,
+    campaign: campaign === 'professional' || campaign === 'passion' || campaign === 'persuasive' || campaign === 'new-arrival' || campaign === 'eid-fitr' || campaign === 'eid-adha' || campaign === 'festival' || campaign === 'women'
+      ? campaign
+      : DEFAULT_MARKETING_TEXT_PREFERENCES.campaign,
+    emphasis: emphasis === 'normal' || emphasis === 'bold' || emphasis === 'featured'
+      ? emphasis
+      : DEFAULT_MARKETING_TEXT_PREFERENCES.emphasis,
   };
 }
 
@@ -118,6 +147,20 @@ function callToAction(goal: MarketingTextGoal, product: string, variant: number)
   return choose(actions[goal], variant);
 }
 
+function campaignLead(campaign: MarketingTextCampaign, product: string) {
+  const leads: Record<MarketingTextCampaign, string> = {
+    professional: '',
+    passion: `اختيار يمنح إطلالتك إحساساً أجمل مع ${product}.`,
+    persuasive: `تفاصيل مختارة بعناية في ${product}.`,
+    'new-arrival': `وصل حديثاً ${product}.`,
+    'eid-fitr': `ضمن اختيارات عيد الفطر: ${product}.`,
+    'eid-adha': `ضمن اختيارات عيد الأضحى: ${product}.`,
+    festival: `ضمن عروض المهرجان: ${product}.`,
+    women: `اختيار أنيق بذوق أنثوي مع ${product}.`,
+  };
+  return leads[campaign];
+}
+
 /**
  * مؤلف محلي لا يحتاج اتصالاً أو نموذجاً خارجياً. لا يذكر إلا بيانات أدخلها المستخدم،
  * ويغيّر الصياغة وفق النبرة والطول والهدف من دون اختلاق خصم أو ضمان أو ندرة.
@@ -152,6 +195,7 @@ export function generateLocalMarketingText(
     phone ? `${preferences.goal === 'inquiry' ? 'للتواصل' : 'للطلب والاستفسار'}: ${phone}.` : '',
   ].filter(Boolean);
   const action = callToAction(preferences.goal, product, variant + 1);
+  const campaign = campaignLead(preferences.campaign, product);
 
   const sentences = [
     `${lead}${headline ? ` — ${headline}` : ''}.`,
@@ -159,13 +203,14 @@ export function generateLocalMarketingText(
     colorSentence,
     ...offerParts,
     ...contact,
+    campaign,
     `${action}.`,
   ].filter(Boolean);
 
   const selected = preferences.length === 'short'
-    ? [sentences[0], sentences[sentences.length - 1]]
+    ? [sentences[0], campaign, sentences[sentences.length - 1]]
     : preferences.length === 'medium'
-      ? [sentences[0], featureSentence || colorSentence || offerParts[0], contact.join(' '), sentences[sentences.length - 1]]
+      ? [sentences[0], campaign || featureSentence || colorSentence || offerParts[0], contact.join(' '), sentences[sentences.length - 1]]
       : sentences;
 
   const plainText = sanitizeMarketingText(selected.filter(Boolean).join(' '));
@@ -199,18 +244,35 @@ export function formatMarketingTextForWhatsApp(
   const store = escapeWhatsAppEmphasis(details.storeName);
   const phone = escapeWhatsAppEmphasis(details.storePhone);
   const summary = sanitizeMarketingText(text, 340);
+  const priceLine = price ? `💰 ${resolved.emphasis === 'normal' ? 'السعر:' : '*السعر:*'} ${price}${currency ? ` ${currency}` : ''}` : '';
+  if (resolved.emphasis === 'normal') {
+    return sanitizeWhatsAppText([
+      `✨ ${product}`,
+      headline ? `🌟 ${headline}` : '',
+      summary ? `📝 ${summary}` : '',
+      features.length ? `✅ المميزات\n${features.map(feature => `• ${feature}`).join('\n')}` : '',
+      colors.length ? `🎨 الألوان: ${colors.join('، ')}` : '',
+      priceLine,
+      discount ? `🏷️ الخصم: ${discount}%` : '',
+      quantity ? `📦 الكمية المتاحة: ${quantity}` : '',
+      resolved.goal === 'inquiry' ? '💬 راسلنا للاستفسار والتفاصيل.' : resolved.goal === 'showcase' ? '👀 اكتشف التفاصيل واختر ما يناسبك.' : '🛍️ اطلب الآن قبل انتهاء التوفر.',
+      store ? `🏪 ${store}` : '',
+      phone ? `📲 🚚 اطلب الآن عبر خدمة التوصيل: ${phone}` : '',
+    ].filter(Boolean).join('\n\n'), 620);
+  }
+  const emphasizedSummary = resolved.emphasis === 'bold' && summary ? `*${summary}*` : summary;
   const lines = [
     `✨ *${product}*`,
     headline ? `🌟 ${headline}` : '',
-    summary ? `📝 ${summary}` : '',
+    emphasizedSummary ? `📝 ${emphasizedSummary}` : '',
     features.length ? `✅ *المميزات*\n${features.map(feature => `• ${feature}`).join('\n')}` : '',
     colors.length ? `🎨 *الألوان:* ${colors.join('، ')}` : '',
-    price ? `💰 *السعر:* ${price}${currency ? ` ${currency}` : ''}` : '',
+    priceLine,
     discount ? `🏷️ *خصم:* ${discount}%` : '',
     quantity ? `📦 *الكمية المتاحة:* ${quantity}` : '',
     resolved.goal === 'inquiry' ? '💬 راسلنا للاستفسار والتفاصيل.' : resolved.goal === 'showcase' ? '👀 اكتشف التفاصيل واختر ما يناسبك.' : '🛍️ اطلب الآن قبل انتهاء التوفر.',
     store ? `🏪 *${store}*` : '',
-    phone ? `📲 للتواصل: ${phone}` : '',
+    phone ? `📲 🚚 اطلب الآن عبر خدمة التوصيل: ${phone}` : '',
   ].filter(Boolean);
   return sanitizeWhatsAppText(lines.join('\n\n'), 620);
 }

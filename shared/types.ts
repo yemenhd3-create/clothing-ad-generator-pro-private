@@ -45,6 +45,8 @@ export type MarketingTextLength = 'short' | 'medium' | 'long';
 export type MarketingTextGoal = 'purchase' | 'inquiry' | 'showcase';
 export type MarketingTextEngine = 'local' | 'cloud';
 export type MarketingTextFormat = 'whatsapp' | 'plain';
+export type MarketingTextCampaign = 'professional' | 'passion' | 'persuasive' | 'new-arrival' | 'eid-fitr' | 'eid-adha' | 'festival' | 'women';
+export type MarketingTextEmphasis = 'normal' | 'bold' | 'featured';
 
 /** اختيارات توليد النص، وهي اختيارية حتى تبقى المسودات القديمة متوافقة. */
 export interface MarketingTextPreferences {
@@ -52,6 +54,8 @@ export interface MarketingTextPreferences {
   length: MarketingTextLength;
   goal: MarketingTextGoal;
   format: MarketingTextFormat;
+  campaign: MarketingTextCampaign;
+  emphasis: MarketingTextEmphasis;
 }
 
 export type AdWorkflowStep = 'upload' | 'details' | 'final';
@@ -477,6 +481,8 @@ export const DEFAULT_AD_DETAILS: AdDetails = {
     length: 'medium',
     goal: 'purchase',
     format: 'whatsapp',
+    campaign: 'professional',
+    emphasis: 'featured',
   },
   marketingTextEngine: 'local',
 };

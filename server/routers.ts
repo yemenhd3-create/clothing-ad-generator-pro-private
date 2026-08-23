@@ -208,6 +208,8 @@ export const appRouter = router({
             length: z.enum(['short', 'medium', 'long']),
             goal: z.enum(['purchase', 'inquiry', 'showcase']),
             format: z.enum(['whatsapp', 'plain']).optional(),
+            campaign: z.enum(['professional', 'passion', 'persuasive', 'new-arrival', 'eid-fitr', 'eid-adha', 'festival', 'women']).optional(),
+            emphasis: z.enum(['normal', 'bold', 'featured']).optional(),
           }).optional(),
         }),
         preferences: z.object({
@@ -215,6 +217,8 @@ export const appRouter = router({
           length: z.enum(['short', 'medium', 'long']),
           goal: z.enum(['purchase', 'inquiry', 'showcase']),
           format: z.enum(['whatsapp', 'plain']),
+          campaign: z.enum(['professional', 'passion', 'persuasive', 'new-arrival', 'eid-fitr', 'eid-adha', 'festival', 'women']),
+          emphasis: z.enum(['normal', 'bold', 'featured']),
         }),
         variant: z.number().int().min(0).max(20).optional(),
       }))

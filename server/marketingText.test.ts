@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AD_DETAILS } from '../shared/types';
 import { formatMarketingTextForWhatsApp, generateLocalMarketingText, sanitizeMarketingText } from '../shared/marketingText';
 
-const invokeLLM = vi.fn();
-vi.mock('./_core/llm', () => ({ invokeLLM }));
+vi.mock('./_core/env', () => ({ ENV: { forgeApiUrl: 'https://forge.test', forgeApiKey: 'test-key' } }));
 
-const { generateMarketingTextWithFallback } = await import('./marketingText');
+const { generateMarketingTextWithFallback, MARKETING_TEXT_MODEL_CHAIN } = await import('./marketingText');
+
+function modelResponse(text: string) {
+  return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ text }) } }] }) };
+}
+
+afterEach(() => vi.unstubAllGlobals());
 
 const details = {
   ...DEFAULT_AD_DETAILS,
@@ -57,29 +62,62 @@ describe('مولد النص التسويقي العربي', () => {
     expect(text).toContain('✨ *فستان صيفي*');
     expect(text).toContain('✅ *المميزات*');
     expect(text).toContain('💰 *السعر:* 5000 ريال');
-    expect(text).toContain('📲 للتواصل: 770976559');
+    expect(text).toContain('📲 🚚 اطلب الآن عبر خدمة التوصيل: 770976559');
     expect(text).toContain('\n');
     expect(text).not.toContain('شحن مجاني');
     expect(text).not.toContain('ضمان');
   });
 
-  it('يستخدم نص النموذج المنظم عند نجاح المسار السحابي', async () => {
-    invokeLLM.mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ text: 'فستان صيفي بتفاصيل أنيقة، تواصلي معنا لمعرفة الألوان المتاحة.' }) } }] });
+  it('يدعم الحملات والتنسيق العادي من دون إدخال نجوم واتساب', () => {
+    const text = generateLocalMarketingText(details, { campaign: 'eid-fitr', emphasis: 'normal', length: 'medium' }, 2).text;
+
+    expect(text).toContain('عيد الفطر');
+    expect(text).toContain('5000 ريال');
+    expect(text).not.toContain('*السعر:*');
+    expect(text).toContain('خدمة التوصيل: 770976559');
+  });
+
+  it('يبرز ملخص النص عند اختيار التنسيق العريض', () => {
+    const text = formatMarketingTextForWhatsApp(details, 'فستان صيفي بتفاصيل مبهجة.', { emphasis: 'bold', format: 'whatsapp' });
+
+    expect(text).toContain('📝 *فستان صيفي بتفاصيل مبهجة.*');
+  });
+
+  it('يستخدم أول نموذج متصل صالحاً ويتوقف من دون استدعاء بقية النماذج', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(modelResponse('فستان صيفي بتفاصيل أنيقة، تواصلي معنا لمعرفة الألوان المتاحة.'));
+    vi.stubGlobal('fetch', fetchMock);
 
     const result = await generateMarketingTextWithFallback(details, { tone: 'formal', length: 'medium', goal: 'inquiry' });
 
-    expect(result).toMatchObject({ source: 'cloud' });
+    expect(result).toMatchObject({ source: 'cloud', provider: 'gpt-5-mini' });
     expect(result.text).toContain('فستان صيفي');
-    expect(invokeLLM).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-5-mini', response_format: expect.any(Object) }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: 'gpt-5-mini' });
   });
 
-  it('يرجع للنص المحلي عند تعذر المسار السحابي', async () => {
-    invokeLLM.mockRejectedValueOnce(new Error('offline'));
+  it('ينتقل إلى النموذج التالي بسرعة عند فشل الأول ثم يقبل أول رد صالح', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(modelResponse('وصل فستان صيفي بتفاصيل ناعمة وجاهز للطلب.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMarketingTextWithFallback(details, { tone: 'persuasive', length: 'medium', goal: 'purchase' });
+
+    expect(result).toMatchObject({ source: 'cloud', provider: 'gemini-3-flash-preview' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: MARKETING_TEXT_MODEL_CHAIN[0] });
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ model: MARKETING_TEXT_MODEL_CHAIN[1] });
+  });
+
+  it('يرجع للنص المحلي فقط بعد تعذر النماذج الخمسة ولا يوقف الأداة', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
+    vi.stubGlobal('fetch', fetchMock);
 
     const result = await generateMarketingTextWithFallback(details, { tone: 'persuasive', length: 'medium', goal: 'purchase' });
 
     expect(result.source).toBe('local-fallback');
     expect(result.text).toContain('فستان صيفي');
     expect(result.message).toContain('الصياغة المحلية');
+    expect(fetchMock).toHaveBeenCalledTimes(MARKETING_TEXT_MODEL_CHAIN.length);
   });
 });

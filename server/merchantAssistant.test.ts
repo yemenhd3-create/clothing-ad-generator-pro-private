@@ -64,6 +64,16 @@ describe('Merchant Assistant rules-first commands', () => {
     expect('arbitraryCode' in profile).toBe(false);
   });
 
+  it('يحفظ تفضيلات النص التسويقي المعتمدة فقط للصور التالية', () => {
+    const profile = normalizeMerchantProfile({
+      version: 1,
+      defaultColors: [],
+      marketingPreferences: { campaign: 'women', emphasis: 'featured', length: 'long', unexpected: 'ignored' },
+    });
+
+    expect(profile.marketingPreferences).toEqual({ campaign: 'women', emphasis: 'featured', length: 'long' });
+  });
+
   it('يفهم طلب تحسين النص التسويقي ويعيد توليده محلياً من بيانات الإعلان لا من خدمة خارجية', () => {
     const commands = parseMerchantCommands('قم بتغيير النص التسويقي إلى أفضل وأقصر للواتساب');
     const result = applyMerchantCommands({ ...DEFAULT_TEMPLATE_SETTINGS }, createMerchantProfile(), commands, {
