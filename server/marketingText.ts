@@ -19,7 +19,13 @@ export const MARKETING_TEXT_MODEL_CHAIN = [
 
 export type MarketingTextCloudProvider = (typeof MARKETING_TEXT_MODEL_CHAIN)[number];
 
-const MODEL_TIMEOUT_MS = 3_200;
+const MODEL_TIMEOUT_MS = 650;
+const TOTAL_CHAIN_TIMEOUT_MS = 1_800;
+
+function isUsableMarketingText(text: string) {
+  const meaningful = text.replace(/[\s.,،…!?؟:;؛_\-]/g, '');
+  return meaningful.length >= 6 && /[A-Za-z0-9\u0600-\u06FF]/.test(meaningful);
+}
 
 function buildMarketingPrompt(details: AdDetails, preferences: MarketingTextPreferences, variant: number) {
   return JSON.stringify({
@@ -63,7 +69,7 @@ function responseSchema() {
   } as const;
 }
 
-async function askMarketingModel(model: MarketingTextCloudProvider, details: AdDetails, preferences: MarketingTextPreferences, variant: number): Promise<string> {
+async function askMarketingModel(model: MarketingTextCloudProvider, details: AdDetails, preferences: MarketingTextPreferences, variant: number, timeoutMs: number): Promise<string> {
   if (!ENV.forgeApiUrl || !ENV.forgeApiKey) throw new Error('لا تتوفر خدمة النماذج المتصلة');
   const response = await fetch(`${ENV.forgeApiUrl.replace(/\/$/, '')}/v1/chat/completions`, {
     method: 'POST',
@@ -83,14 +89,14 @@ async function askMarketingModel(model: MarketingTextCloudProvider, details: AdD
       ],
       response_format: responseSchema(),
     }),
-    signal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`تعذر النموذج المتصل: ${response.status}`);
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const raw = payload.choices?.[0]?.message?.content;
   const parsed = typeof raw === 'string' ? JSON.parse(raw) as { text?: unknown } : null;
   const text = typeof parsed?.text === 'string' ? sanitizeMarketingText(parsed.text) : '';
-  if (text.length < 8) throw new Error('لم يرجع النموذج نصاً صالحاً');
+  if (!isUsableMarketingText(text)) throw new Error('لم يرجع النموذج نصاً صالحاً');
   return text;
 }
 
@@ -101,10 +107,13 @@ export async function generateMarketingTextWithFallback(
 ): Promise<MarketingTextGenerationResult> {
   const resolvedPreferences = resolveMarketingTextPreferences(preferences || details.marketingPreferences);
   const local = generateLocalMarketingText(details, resolvedPreferences, variant);
+  const deadline = Date.now() + TOTAL_CHAIN_TIMEOUT_MS;
 
   for (const provider of MARKETING_TEXT_MODEL_CHAIN) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 150) break;
     try {
-      const text = await askMarketingModel(provider, details, resolvedPreferences, variant);
+      const text = await askMarketingModel(provider, details, resolvedPreferences, variant, Math.min(MODEL_TIMEOUT_MS, remainingMs));
       return {
         text: resolvedPreferences.format === 'whatsapp' ? formatMarketingTextForWhatsApp(details, text, resolvedPreferences) : text,
         source: 'cloud',

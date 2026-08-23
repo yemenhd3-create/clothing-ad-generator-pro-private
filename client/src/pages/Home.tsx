@@ -702,9 +702,9 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       currency: details.currency.trim() || 'ريال',
       marketingText: '',
     };
+    const local = generateLocalMarketingText(generationDetails, preferences, variant);
+    handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
     if (friendTestMode || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
-      const local = generateLocalMarketingText(generationDetails, preferences, variant);
-      handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
       return { ...local, source: 'local-fallback' as const, message: friendTestMode ? 'وضع الاختبار يستخدم المولد المحلي فوراً.' : 'لا يوجد اتصال، فاستخدمنا المولد المحلي فوراً.' };
     }
     try {
@@ -712,8 +712,6 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       handleMarketingDetailsChange({ marketingText: result.text, marketingPreferences: preferences, marketingTextEngine: result.source === 'cloud' ? 'cloud' : 'local' });
       return result;
     } catch {
-      const local = generateLocalMarketingText(generationDetails, preferences, variant);
-      handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
       return { ...local, source: 'local-fallback' as const, message: 'تعذر الاتصال، فاستخدمنا المولد المحلي فوراً.' };
     }
   };

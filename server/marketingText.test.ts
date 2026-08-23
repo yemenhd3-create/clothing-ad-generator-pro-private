@@ -109,6 +109,19 @@ describe('مولد النص التسويقي العربي', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ model: MARKETING_TEXT_MODEL_CHAIN[1] });
   });
 
+  it('يرفض النص المكوّن من نقاط فقط ثم ينتقل إلى النموذج التالي أو الرجوع المحلي', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(modelResponse('........'))
+      .mockResolvedValueOnce(modelResponse('وصل فستان صيفي بتفاصيل ناعمة وجاهز للطلب.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMarketingTextWithFallback(details, { tone: 'persuasive', length: 'medium', goal: 'purchase' });
+
+    expect(result).toMatchObject({ source: 'cloud', provider: 'gemini-3-flash-preview' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.text).not.toBe('........');
+  });
+
   it('يرجع للنص المحلي فقط بعد تعذر النماذج الخمسة ولا يوقف الأداة', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
     vi.stubGlobal('fetch', fetchMock);
