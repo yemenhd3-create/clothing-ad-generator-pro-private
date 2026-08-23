@@ -88,6 +88,15 @@ describe('Home Try-On workflow', () => {
 
   afterEach(() => cleanup());
 
+  it('يعرض وصولاً مباشراً إلى إعدادات الإعلان ولوحة المطور من أيقونة الرأس', async () => {
+    render(createElement(Home));
+
+    fireEvent.click(screen.getByRole('button', { name: 'الإعدادات والوصول للمطور' }));
+
+    expect(await screen.findByRole('button', { name: 'إعدادات الإعلان' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'لوحة المطور' })).toBeTruthy();
+  });
+
   async function startGeneration() {
     render(createElement(Home));
     fireEvent.click(screen.getByRole('button', { name: 'رفع صورة اختبار' }));

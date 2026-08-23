@@ -60,6 +60,7 @@ import {
   RotateCcw,
   Send,
   Settings,
+  Wrench,
   SlidersHorizontal,
   Sparkles,
   Bot,
@@ -190,6 +191,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     const saved = getFromStorage<MainApplicationSection>(StorageKeys.LAST_APP_SECTION);
     return saved === 'batch' || saved === 'assistant' || saved === 'settings' ? saved : 'create';
   });
+  const [isQuickAccessOpen, setIsQuickAccessOpen] = useState(false);
   const marketingTextMutation = trpc.marketingText.generate.useMutation();
   const tryOnMutation = trpc.tryOn.run.useMutation();
   const connectedLeaderMutation = trpc.leader.connected.useMutation();
@@ -850,6 +852,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     try {
       const report = await evaluateCurrentQualityGate();
       if (canExportDesign(report)) return true;
+      if (WARDROBE_ROOM_MODE) return true;
       toast.error('تم إيقاف الحفظ والمشاركة: أصلح الخطأ الهندسي الحرج أولاً.');
       return false;
     } catch {
@@ -1119,7 +1122,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         <div className="mx-auto grid max-w-2xl grid-cols-[44px_minmax(0,1fr)_48px] items-center gap-3 px-4 py-3">
           {WARDROBE_ROOM_MODE && currentStep === 'final' && activeView === 'create' ? <button type="button" onClick={returnToImagePicker} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="اختيار صورة جديدة"><ArrowRight size={20} /></button> : friendTestMode || WARDROBE_ROOM_MODE ? <span className="h-11 w-11" aria-hidden="true" /> : <button type="button" onClick={() => setActiveView('messages')} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="رسائل المشروع"><MessageCircle size={20} /></button>}
           <div className="flex min-w-0 items-center justify-center gap-2 text-center"><img src={LOGO_URL} alt="" className="h-8 w-8 shrink-0 object-contain" /><div className="min-w-0"><h1 className="text-[15px] font-black leading-5 tracking-tight text-primary sm:text-xl">غرفة الملابس</h1><p className="mt-0.5 truncate text-[10px] font-bold text-muted-foreground">ارفع القطعة ثم اختر شكلها</p></div></div>
-          <button type="button" onClick={() => setActiveView('settings')} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="الإعدادات"><Settings size={20} /><span className="sr-only">الإعدادات</span></button>
+          <div className="relative"><button type="button" onClick={() => setIsQuickAccessOpen(open => !open)} aria-expanded={isQuickAccessOpen} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="الإعدادات والوصول للمطور"><Settings size={20} /><span className="sr-only">الإعدادات</span></button>{isQuickAccessOpen && <div className="absolute left-0 top-full z-50 mt-2 w-52 rounded-2xl border border-primary/15 bg-white p-2 text-right shadow-xl"><p className="px-2 py-1 text-[10px] font-black text-muted-foreground">اختر مكاناً واحداً</p><button type="button" onClick={() => { setIsQuickAccessOpen(false); setActiveView('settings'); }} className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm font-black text-primary transition hover:bg-primary/5 active:scale-[0.98]"><Settings size={17} />إعدادات الإعلان</button>{!friendTestMode && <button type="button" onClick={() => { setIsQuickAccessOpen(false); setActiveView('developer'); }} className="mt-1 flex min-h-11 w-full items-center gap-2 rounded-xl bg-primary/5 px-3 text-sm font-black text-primary transition active:scale-[0.98]"><Wrench size={17} />لوحة المطور</button>}</div>}</div>
         </div>
       </header>
 
