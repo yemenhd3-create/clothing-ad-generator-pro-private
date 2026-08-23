@@ -589,14 +589,17 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       setCurrentStep('upload');
       return;
     }
-    setIsGenerating(true);
-    setGeneratedAd('');
-    setDesignPassport(null);
-    setDesignContractReport(null);
-    setQualityGateReport(null);
-    setTemplateBeforeContractRepair(null);
-    setVisualRepairSnapshot(null);
-    setVisualRepairStatus('idle');
+    const retainStudioPreview = WARDROBE_ROOM_MODE && Boolean(generatedAd);
+    if (!retainStudioPreview) {
+      setIsGenerating(true);
+      setGeneratedAd('');
+      setDesignPassport(null);
+      setDesignContractReport(null);
+      setQualityGateReport(null);
+      setTemplateBeforeContractRepair(null);
+      setVisualRepairSnapshot(null);
+      setVisualRepairStatus('idle');
+    }
     try {
       const requestedTemplate = templateOverride || templateSettings;
       const activeTemplate = WARDROBE_ROOM_MODE ? createWardrobeTemplate(requestedTemplate) : requestedTemplate;
@@ -609,7 +612,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       );
       setGeneratedAd(output);
       setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(activeDetails));
-      if (WARDROBE_ROOM_MODE) { toast.success(successMessage); return true; }
+      if (WARDROBE_ROOM_MODE) return true;
       const document = compileDesignDocument(activeDetails, activeTemplate, designSuggestion);
       const contract = evaluateDesignContract(document);
       const pixelTruth = await inspectRenderedPixelTruth(output, document);
@@ -622,7 +625,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       toast.error('تعذرت إعادة توليد الإعلان بالتغييرات الجديدة. حاول مرة أخرى.');
       return false;
     } finally {
-      setIsGenerating(false);
+      if (!retainStudioPreview) setIsGenerating(false);
     }
   };
 
@@ -649,7 +652,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setTemplateSettings(updatedTemplate);
   };
 
-  const handleStudioAppearanceChange = (patch: Partial<Pick<TemplateSettings, 'productBackdrop' | 'productShadow' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor'>>) => {
+  const handleStudioAppearanceChange = (patch: StudioAppearancePatch) => {
     const updatedTemplate = { ...templateSettings, ...patch };
     setTemplateSettings(updatedTemplate);
     if (generatedAd) void regenerateWithCurrentSettings(updatedTemplate, 'تم تحديث الاستديو محلياً.');
@@ -1288,7 +1291,7 @@ function WardrobeToolPanel({ tool, settings, disabled, onClose, onChange, onScal
   const shadows: Array<{ id: NonNullable<TemplateSettings['productShadow']>; label: string }> = [{ id: 'none', label: 'بلا ظل' }, { id: 'soft', label: 'ناعم' }, { id: 'grounded', label: 'أرضي' }];
   const currentScale = clampProductScale(settings.productScale);
   const title = tool === 'backdrop' ? 'خلفية القالب' : tool === 'shadow' ? 'ظل تحت المنتج' : tool === 'size' ? 'حجم المنتج' : tool === 'overlay' ? 'نص وسعر' : 'تعديل الصورة';
-  return <section className="absolute inset-x-0 z-20 rounded-2xl border border-primary/15 bg-white p-3 shadow-xl" style={{ bottom: 96 }} aria-label={title}><div className="mb-2 flex items-center justify-between"><h3 className="text-sm font-black text-primary">{title}</h3><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-primary">إغلاق</button></div>{tool === 'backdrop' && <div className="grid grid-cols-4 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl px-2 py-3 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'shadow' && <div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl px-2 py-3 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onClose={onClose} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">افتح الممحاة والعصا والتحديد الحر لتعديل الحواف محلياً، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="reference-primary mt-3 w-full"><Wand2 size={17} />فتح تعديل الصورة</button></div>}</section>;
+  return <section className="absolute z-20 rounded-2xl border border-primary/15 bg-white p-2 shadow-xl" style={{ bottom: 96, left: 12, right: 12 }} aria-label={title}><div className="mb-1 flex items-center justify-between"><h3 className="text-sm font-black text-primary">{title}</h3><button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-xs font-black text-primary">إغلاق</button></div>{tool === 'backdrop' && <div className="grid grid-cols-4 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'shadow' && <div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl px-2 py-2 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onClose={onClose} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">افتح الممحاة والعصا والتحديد الحر لتعديل الحواف محلياً، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="reference-primary mt-2 w-full"><Wand2 size={17} />فتح تعديل الصورة</button></div>}</section>;
 }
 
 function FloatingOverlayEditor({ settings, disabled, onChange, onClose }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void; onClose: () => void }) {
