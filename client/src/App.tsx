@@ -1,5 +1,5 @@
 import NotFound from "@/pages/NotFound";
-import { lazy, Suspense } from "react";
+import React, { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -58,7 +58,7 @@ function ProjectAccessGate() {
   if (modeQuery.data?.loginRequired !== false) {
     return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
   }
-  return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الدخول المباشر…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
+  return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الدخول المباشر…" />}><AuthenticatedApplication /></Suspense>;
 }
 
 function DeviceCheckHome() {

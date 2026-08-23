@@ -7,6 +7,19 @@ function requireDb<T>(db: T | null): T {
   return db;
 }
 
+function settleWithin<T>(work: Promise<T>, milliseconds: number, fallback: T): Promise<T> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(fallback), milliseconds);
+    work.then(value => {
+      clearTimeout(timer);
+      resolve(value);
+    }).catch(() => {
+      clearTimeout(timer);
+      resolve(fallback);
+    });
+  });
+}
+
 export async function getUserAccess(userId: number) {
   const db = requireDb(await getDb());
   const user = (await db.select({ id: users.id, isDisabled: users.isDisabled, role: users.role })
@@ -91,11 +104,13 @@ export async function setPersonalUserAccess(id: number, isDisabled: boolean) {
 }
 
 export async function getProjectAccessSettings() {
-  const db = requireDb(await getDb());
-  const current = (await db.select().from(projectAccessSettings).where(eq(projectAccessSettings.id, 1)).limit(1))[0];
-  if (current) return { loginRequired: current.loginRequired === 1 };
-  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1 });
-  return { loginRequired: true };
+  return settleWithin((async () => {
+    const db = requireDb(await getDb());
+    const current = (await db.select().from(projectAccessSettings).where(eq(projectAccessSettings.id, 1)).limit(1))[0];
+    if (current) return { loginRequired: current.loginRequired === 1 };
+    await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1 });
+    return { loginRequired: true };
+  })(), 2_500, { loginRequired: true });
 }
 
 export async function setProjectLoginRequired(loginRequired: boolean) {

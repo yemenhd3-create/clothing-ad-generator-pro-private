@@ -201,7 +201,7 @@ export const DEFAULT_PRODUCT_SCALE = 0.92;
 /** نمط بصري محلي مستقل عن مقاس التصدير؛ يبقى اختياريًا لتوافق المسودات القديمة. */
 export type TemplateVisualTheme = 'classic' | 'midnight' | 'rose' | 'mint' | 'sand';
 /** خلفية استديو محلية داخل منطقة المنتج؛ لا تتطلب نموذج صور أو اتصالاً خارجياً. */
-export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight' | 'rose' | 'sand';
+export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight' | 'rose' | 'sand' | 'plum' | 'peach' | 'blush' | 'navy' | 'denim' | 'sky' | 'teal' | 'mint' | 'sage' | 'lemon' | 'coral' | 'charcoal' | 'ivory' | 'lavender';
 /** ظل هندسي محلي يوضع أسفل المنتج الشفاف داخل مساحة البطل. */
 export type ProductShadowPreset = 'none' | 'soft' | 'grounded';
 /** بروز بصري محلي خفيف؛ ليس نموذج 3D ولا ينشئ زوايا أو محتوى جديداً. */

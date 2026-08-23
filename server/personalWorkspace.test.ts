@@ -43,4 +43,9 @@ describe('personal workspace data access', () => {
     await expect(setProjectLoginRequired(false)).resolves.toEqual({ loginRequired: false });
     expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 0 });
   });
+
+  it('يعيد وضع التأمين عند تعذر قراءة إعداد الدخول بدلاً من إبقاء الواجهة معلقة', async () => {
+    getDb.mockRejectedValueOnce(new Error('database unavailable'));
+    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true });
+  });
 });

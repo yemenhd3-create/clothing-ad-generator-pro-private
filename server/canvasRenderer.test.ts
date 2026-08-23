@@ -177,6 +177,16 @@ describe('Canvas advertisement renderer', () => {
     }
   });
 
+  it('يرسم القوالب اللونية الإضافية محلياً من دون تغيير صورة القطعة أو طلب أي أصل خارجي', async () => {
+    for (const productBackdrop of ['plum', 'peach', 'blush', 'navy', 'denim', 'sky', 'teal', 'mint', 'sage', 'lemon', 'coral', 'charcoal', 'ivory', 'lavender'] as const) {
+      context.__createRadialGradient.mockClear();
+      context.__drawImage.mockClear();
+      await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productBackdrop }, 'blob:garment-image', { width: 1080, height: 1350 });
+      expect(context.__createRadialGradient).toHaveBeenCalledTimes(2);
+      expect(context.__drawImage.mock.calls.at(-1)?.[7]).toBeGreaterThan(160);
+    }
+  });
+
   it('يضيف البروز البصري الاختياري خلف قطعة الملابس فقط ولا يبدل موضع المنتج الأمامي', async () => {
     await renderAd(DEFAULT_AD_DETAILS, { ...DEFAULT_TEMPLATE_SETTINGS, productPresentation: 'flat' }, 'blob:garment-image', { width: 1080, height: 1350 });
     const flatCall = context.__drawImage.mock.calls.at(-1);

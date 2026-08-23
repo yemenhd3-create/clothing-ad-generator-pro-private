@@ -132,6 +132,11 @@ function drawHeroBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop: Pro
     spotlight: ['rgba(255,255,255,.99)', 'rgba(232,227,245,.82)'],
     rose: ['#fff9fc', '#f3d9e6'],
     sand: ['#fffdf8', '#e9dcc7'],
+    plum: ['#fffaff', '#e7d8f0'], peach: ['#fffaf7', '#f5d7c8'], blush: ['#fffafb', '#f2d8de'],
+    navy: ['#f8faff', '#d6ddef'], denim: ['#f7fbff', '#d2e6f3'], sky: ['#f7fdff', '#d3edf6'],
+    teal: ['#f5fffe', '#d0ece7'], mint: ['#f8fffb', '#d9f0e3'], sage: ['#fbfdf8', '#dfe9cf'],
+    lemon: ['#fffef6', '#f6eab8'], coral: ['#fff9f7', '#f2d2c8'], charcoal: ['#fafafa', '#dde0e4'],
+    ivory: ['#fffdf7', '#eee4cf'], lavender: ['#fbf9ff', '#e1daf5'],
   };
   const [center, edge] = colors[backdrop];
   const gradient = ctx.createRadialGradient(box.x + box.width / 2, box.y + box.height * .38, Math.max(1, box.width * .04), box.x + box.width / 2, box.y + box.height / 2, Math.max(box.width, box.height) * .72);
@@ -152,6 +157,11 @@ function drawWardrobeBackdrop(ctx: CanvasRenderingContext2D, box: Box, backdrop:
     spotlight: ['#ffffff', '#e7ddf5'],
     rose: ['#fffafd', '#efd8e4'],
     sand: ['#fffdf8', '#e6d8c2'],
+    plum: ['#fffaff', '#e7d8f0'], peach: ['#fffaf7', '#f5d7c8'], blush: ['#fffafb', '#f2d8de'],
+    navy: ['#f8faff', '#d6ddef'], denim: ['#f7fbff', '#d2e6f3'], sky: ['#f7fdff', '#d3edf6'],
+    teal: ['#f5fffe', '#d0ece7'], mint: ['#f8fffb', '#d9f0e3'], sage: ['#fbfdf8', '#dfe9cf'],
+    lemon: ['#fffef6', '#f6eab8'], coral: ['#fff9f7', '#f2d2c8'], charcoal: ['#fafafa', '#dde0e4'],
+    ivory: ['#fffdf7', '#eee4cf'], lavender: ['#fbf9ff', '#e1daf5'],
   };
   const [center, edge] = colors[backdrop];
   const gradient = ctx.createRadialGradient(box.x + box.width / 2, box.y + box.height * .35, Math.max(1, box.width * .02), box.x + box.width / 2, box.y + box.height * .52, Math.max(box.width, box.height) * .7);

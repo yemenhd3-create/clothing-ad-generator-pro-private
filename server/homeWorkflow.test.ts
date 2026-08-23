@@ -234,6 +234,14 @@ describe('Home Try-On workflow', () => {
     ));
   });
 
+  it('يبقي مدخل لوحة المطور المحمية متاحاً من الإعدادات في التطبيق الكامل', async () => {
+    render(createElement(Home));
+    fireEvent.click(screen.getAllByRole('button', { name: 'الإعدادات' })[0]);
+    await screen.findByText('عدّل شكل الإعلان عند الحاجة');
+    fireEvent.click(screen.getByRole('button', { name: /المساعدة والتطبيق/ }));
+    expect(await screen.findByRole('button', { name: 'فتح لوحة المطور المحمية' })).toBeTruthy();
+  });
+
   it('يعيد توليد الإعلان النهائي بإعدادات القالب المعدلة من دون تكرار طلب Try-On', async () => {
     mutateAsync.mockRejectedValue(new Error('لا يوجد مزود مفعّل'));
     await startGeneration();
