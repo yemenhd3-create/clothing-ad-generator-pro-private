@@ -78,4 +78,13 @@ describe('طبقات هوية المتجر في الإعدادات', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ظل ثابت' }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ productBackdrop: 'warm', productShadow: 'grounded' }));
   });
+
+  it('يعرض قائمة اختبار الهاتف المختصرة من المساعدة عند طلبها فقط', () => {
+    render(<UserTemplateSettings settings={DEFAULT_TEMPLATE_SETTINGS} onChange={vi.fn()} onBack={vi.fn()} onAbout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /المساعدة والتطبيق/ }));
+    expect(screen.queryByText('جرّب هذه الخطوات الست فقط')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'اختبار الهاتف السريع' }));
+    expect(screen.getByText('جرّب هذه الخطوات الست فقط')).toBeTruthy();
+    expect(screen.getByText(/2D أصلي ثم 2.5D مرتفع ثم منصة/)).toBeTruthy();
+  });
 });

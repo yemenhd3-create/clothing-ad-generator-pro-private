@@ -92,6 +92,7 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
   const [artworkError, setArtworkError] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [openCard, setOpenCard] = useState<SettingsCardKey>('size');
+  const [phoneChecklistVisible, setPhoneChecklistVisible] = useState(false);
   const [pendingArtwork, setPendingArtwork] = useState<{ kind: 'logo' | 'footer'; source: string } | null>(null);
   const visibleCount = toggles.filter(item => settings[item.key]).length;
   const selectedBadges = settings.badgeTypes?.slice() || (settings.badgeType !== 'none' ? [settings.badgeType] : []);
@@ -172,6 +173,8 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
     <SettingsCard id="help" icon={CircleHelp} title="المساعدة والتطبيق" summary="دليل الاستخدام، معلومات المشروع، ولوحة المطور المحمية" open={openCard === 'help'} onToggle={() => setCard('help')}>
       <button type="button" onClick={onAbout} className="flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><Sparkles size={18} />حول التطبيق وبيانات المطور</button>
       {onDeveloper && <button type="button" onClick={onDeveloper} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><Wrench size={18} />فتح لوحة المطور المحمية</button>}
+      <button type="button" onClick={() => setPhoneChecklistVisible(value => !value)} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><MonitorSmartphone size={18} />اختبار الهاتف السريع</button>
+      {phoneChecklistVisible && <div className="mt-3 rounded-2xl border border-primary/10 bg-white p-3"><p className="text-sm font-black text-primary">جرّب هذه الخطوات الست فقط</p><ol className="mt-2 space-y-2 text-xs leading-5 text-muted-foreground"><li>١. ارفع صورة من المعرض أو الكاميرا.</li><li>٢. تأكد أن القالب والأدوات لا تحتاج تمرير الصفحة.</li><li>٣. جرّب 2D أصلي ثم 2.5D مرتفع ثم منصة.</li><li>٤. اسحب شريط المقاسات واختر نسبة أخرى.</li><li>٥. أضف عنواناً وحرّكه ثم انقر خارج اللوحة.</li><li>٦. جرّب تنزيل، الصورة فقط، ثم واتساب.</li></ol></div>}
     </SettingsCard>
 
     <button type="button" onClick={saveSettings} className={`inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-base font-black shadow-lg transition active:scale-[0.98] ${isSaved ? 'bg-emerald-600 text-white shadow-emerald-200' : 'bg-primary text-primary-foreground shadow-primary/20'}`}><CheckCircle2 size={19} />{isSaved ? 'تم حفظ الإعدادات على هذا الهاتف' : 'حفظ الإعدادات'}</button>
