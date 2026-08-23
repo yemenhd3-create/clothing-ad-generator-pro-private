@@ -9,7 +9,7 @@ describe('رسائل أخطاء رفع صور الهاتف', () => {
   });
 
   it('يحافظ على رسالة آمنة وعامة للأخطاء الأخرى', () => {
-    expect(getImagePreparationErrorMessage(new Error('canvas unavailable'))).toContain('JPG أو PNG');
+    expect(getImagePreparationErrorMessage(new Error('canvas unavailable'))).toContain('صور المعرض الشائعة');
   });
 
   it('يشرح تفعيل إذن الكاميرا عند رفض المتصفح الوصول إليها', () => {

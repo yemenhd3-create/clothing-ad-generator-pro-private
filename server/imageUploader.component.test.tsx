@@ -2,7 +2,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import ImageUploader from '../client/src/components/ImageUploader';
+import ImageUploader, { isSupportedImage } from '../client/src/components/ImageUploader';
 
 describe('ImageUploader على هاتف Android', () => {
   beforeEach(() => {
@@ -40,8 +40,9 @@ describe('ImageUploader على هاتف Android', () => {
     const cameraInput = container.querySelector<HTMLInputElement>('input[capture="environment"]');
     const cameraClick = vi.spyOn(cameraInput!, 'click');
 
-    expect(galleryInput.accept).toBe('image/*');
-    expect(cameraInput?.accept).toBe('image/*');
+    expect(galleryInput.accept).toContain('image/*');
+    expect(galleryInput.accept).toContain('.heic');
+    expect(cameraInput?.accept).toContain('image/*');
 
     const file = new File(['photo'], 'dress.jpg', { type: 'image/jpeg' });
     fireEvent.change(galleryInput, { target: { files: [file] } });
@@ -64,5 +65,11 @@ describe('ImageUploader على هاتف Android', () => {
       video: { facingMode: { ideal: 'environment' } },
     }));
     expect(await screen.findByRole('dialog', { name: 'التقاط صورة الملابس بالكاميرا' })).toBeTruthy();
+  });
+
+  it('يقبل صورة معرض مجهولة النوع أو HEIC بالاسم ويستبعد الملفات غير الصورية', () => {
+    expect(isSupportedImage(new File(['photo'], 'WhatsApp Image 2026', { type: 'application/octet-stream' }))).toBe(true);
+    expect(isSupportedImage(new File(['photo'], 'portrait.heic', { type: '' }))).toBe(true);
+    expect(isSupportedImage(new File(['document'], 'invoice.pdf', { type: 'application/pdf' }))).toBe(false);
   });
 });

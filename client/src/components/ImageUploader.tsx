@@ -100,8 +100,8 @@ export default function ImageUploader({
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage('حجم الصورة أكبر من 10 ميجابايت. اختر نسخة أصغر أو قصّ الصورة من معرض الهاتف ثم أعد المحاولة.');
+    if (file.size > 25 * 1024 * 1024) {
+      setErrorMessage('حجم الصورة أكبر من 25 ميجابايت. اختر نسخة أصغر أو قصّ الصورة من معرض الهاتف ثم أعد المحاولة.');
       return;
     }
 
@@ -226,7 +226,7 @@ export default function ImageUploader({
           <h3 className="mb-2 text-lg font-black text-foreground">اختر صورة الملابس</h3>
           <p className="mb-3 text-sm leading-6 text-muted-foreground">من المعرض أو بالكاميرا. الأفضل أن تظهر القطعة وحدها بوضوح.</p>
 
-          <div className="mb-4 flex flex-wrap justify-center gap-2 text-[11px] font-bold text-muted-foreground"><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">قطعة واحدة واضحة</span><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">حتى 10 ميجابايت</span><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">يُحسَّن تلقائياً</span></div>
+          <div className="mb-4 flex flex-wrap justify-center gap-2 text-[11px] font-bold text-muted-foreground"><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">قطعة واحدة واضحة</span><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">حتى 25 ميجابايت</span><span className="rounded-full bg-white px-2.5 py-1 shadow-sm">يُحسَّن تلقائياً</span></div>
 
           {isLoading && <div role="status" aria-live="polite" className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-primary/10 bg-primary/5 px-3 py-3 text-sm font-black text-primary"><LoaderCircle className="animate-spin" size={18} />جارٍ قراءة الصورة وتحسينها للهاتف…</div>}
           {errorMessage && <div role="alert" className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-3 py-3 text-sm font-medium leading-6 text-red-800"><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 shrink-0" size={17} /><p>{errorMessage}</p></div><button type="button" onClick={() => void startCamera()} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-xs font-black text-red-800 shadow-sm" disabled={isLoading || isCameraStarting}><Camera size={14} />جرّب التقاط صورة الآن</button></div>}
@@ -256,14 +256,14 @@ export default function ImageUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif,.avif,.gif,.bmp"
         onChange={handleFileInputChange}
         className="hidden"
       />
       <input
         ref={cameraInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif,.avif,.gif,.bmp"
         capture="environment"
         onChange={handleFileInputChange}
         className="hidden"
@@ -351,9 +351,12 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function isSupportedImage(file: File) {
-  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) return true;
-  return /\.(jpe?g|png|webp)$/i.test(file.name);
+export function isSupportedImage(file: File) {
+  if (file.size < 1) return false;
+  if (file.type.startsWith('image/') || file.type === '' || file.type === 'application/octet-stream') {
+    return !/\.(pdf|docx?|xlsx?|pptx?|zip|rar|7z|mp4|mov|avi|mkv|mp3|wav)$/i.test(file.name);
+  }
+  return /\.(jpe?g|png|webp|heic|heif|avif|gif|bmp|jfif)$/i.test(file.name);
 }
 
 function loadFileImage(sourceUrl: string): Promise<HTMLImageElement> {
