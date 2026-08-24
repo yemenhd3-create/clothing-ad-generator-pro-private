@@ -1,6 +1,7 @@
-import { Check, KeyRound, LockKeyhole, LogOut, Power, RefreshCw, ServerCog, Settings } from 'lucide-react';
+import { Check, KeyRound, LockKeyhole, LogOut, Moon, Power, RefreshCw, ServerCog, Settings, Sun } from 'lucide-react';
 import React, { lazy, Suspense, useState } from 'react';
 import { trpc } from '@/lib/trpc';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Input } from './ui/input';
 
 const DeveloperPersonalConsole = lazy(() => import('./DeveloperPersonalConsole'));
@@ -27,6 +28,7 @@ const DEVELOPER_SECTIONS: Array<{ id: DeveloperSection; label: string; icon: typ
 
 export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   const utils = trpc.useUtils();
+  const { theme, toggleTheme } = useTheme();
   const statusQuery = trpc.developer.status.useQuery();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -104,6 +106,7 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
       {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
       {activeSection === 'system' && <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
         <div className="mb-4 flex items-center justify-between gap-3 text-primary"><div className="flex items-center gap-2"><KeyRound size={19} /><h3 className="font-black">السجل التشخيصي</h3></div><button type="button" onClick={() => setDiagnostics([])} className="text-xs font-bold text-muted-foreground">مسح السجل</button></div>
+        <button type="button" onClick={toggleTheme} className="mb-4 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-secondary px-4 text-right text-primary transition active:scale-[0.98]" aria-label={theme === 'dark' ? 'تفعيل الوضع الفاتح' : 'تفعيل الوضع الليلي'}><span className="inline-flex items-center gap-2 text-sm font-black">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}{theme === 'dark' ? 'الوضع الليلي مفعّل' : 'تفعيل الوضع الليلي'}</span><span className="text-xs font-bold text-muted-foreground">محفوظ على هذا الهاتف</span></button>
         {!diagnostics.length && <p className="rounded-2xl bg-secondary/70 p-4 text-sm text-muted-foreground">لا توجد أحداث في الجلسة الحالية.</p>}
         <div className="space-y-2">{diagnostics.map(entry => <div key={entry.id} className="flex items-start gap-3 rounded-2xl bg-secondary/60 p-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${entry.level === 'success' ? 'bg-emerald-500' : entry.level === 'error' ? 'bg-red-500' : 'bg-primary'}`} /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-foreground">{entry.message}</p><p className="mt-1 text-xs text-muted-foreground">{entry.at}</p></div></div>)}</div>
       </section>}

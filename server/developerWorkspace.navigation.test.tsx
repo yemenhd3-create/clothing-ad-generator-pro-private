@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import DeveloperWorkspace from '../client/src/components/DeveloperWorkspace';
+import { ThemeProvider } from '../client/src/contexts/ThemeContext';
 
 const invalidate = vi.fn();
 
@@ -24,15 +25,23 @@ vi.mock('../client/src/lib/trpc', () => ({
 }));
 
 describe('تنقل لوحة المطور الموحدة', () => {
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); localStorage.clear(); document.documentElement.classList.remove('dark'); });
 
   it('يبدأ بالرئيسية ويتيح الوصول المباشر إلى المزودين والنظام', async () => {
-    render(<DeveloperWorkspace onBack={vi.fn()} />);
+    render(<ThemeProvider switchable><DeveloperWorkspace onBack={vi.fn()} /></ThemeProvider>);
 
     expect(screen.getByText('كل صلاحيات المطور هنا')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'المزودون' }));
     expect(await screen.findByText('إضافة مزود جديد')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'النظام' }));
     expect(screen.getByText('السجل التشخيصي')).toBeTruthy();
+  });
+
+  it('يفعّل الوضع الليلي من قسم النظام ويحفظ الاختيار على الهاتف', async () => {
+    render(<ThemeProvider switchable><DeveloperWorkspace onBack={vi.fn()} /></ThemeProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'النظام' }));
+    fireEvent.click(screen.getByRole('button', { name: 'تفعيل الوضع الليلي' }));
+    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true));
+    expect(localStorage.getItem('theme')).toBe('dark');
   });
 });
