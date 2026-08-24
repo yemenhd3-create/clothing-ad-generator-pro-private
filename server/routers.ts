@@ -202,6 +202,8 @@ export const appRouter = router({
           features: z.array(z.string().max(160)).max(8),
           storeName: z.string().max(160),
           storePhone: z.string().max(80),
+          storeLocation: z.string().max(160).optional().default(''),
+          storeCategory: z.string().max(80).optional().default(''),
           marketingText: z.string().max(520),
           marketingPreferences: z.object({
             tone: z.enum(['exciting', 'persuasive', 'formal', 'playful']),

@@ -181,6 +181,8 @@ export function generateLocalMarketingText(
   const quantity = clean(details.quantity);
   const store = clean(details.storeName);
   const phone = clean(details.storePhone);
+  const location = clean(details.storeLocation);
+  const category = clean(details.storeCategory);
 
   const lead = benefitLead(product, preferences.tone, variant);
   const featureSentence = features.length > 0 ? `يتميّز بـ ${features.join('، ')}.` : '';
@@ -192,6 +194,8 @@ export function generateLocalMarketingText(
   ].filter(Boolean);
   const contact = [
     store ? `متاح لدى ${store}.` : '',
+    category ? `قسم المبيعات: ${category}.` : '',
+    location ? `العنوان: ${location}.` : '',
     phone ? `${preferences.goal === 'inquiry' ? 'للتواصل' : 'للطلب والاستفسار'}: ${phone}.` : '',
   ].filter(Boolean);
   const action = callToAction(preferences.goal, product, variant + 1);
@@ -243,6 +247,8 @@ export function formatMarketingTextForWhatsApp(
   const quantity = escapeWhatsAppEmphasis(details.quantity);
   const store = escapeWhatsAppEmphasis(details.storeName);
   const phone = escapeWhatsAppEmphasis(details.storePhone);
+  const location = escapeWhatsAppEmphasis(details.storeLocation || '');
+  const category = escapeWhatsAppEmphasis(details.storeCategory || '');
   const summary = sanitizeMarketingText(text, 340);
   const priceLine = price ? `💰 ${resolved.emphasis === 'normal' ? 'السعر:' : '*السعر:*'} ${price}${currency ? ` ${currency}` : ''}` : '';
   if (resolved.emphasis === 'normal') {
@@ -257,6 +263,8 @@ export function formatMarketingTextForWhatsApp(
       quantity ? `📦 الكمية المتاحة: ${quantity}` : '',
       resolved.goal === 'inquiry' ? '💬 راسلنا للاستفسار والتفاصيل.' : resolved.goal === 'showcase' ? '👀 اكتشف التفاصيل واختر ما يناسبك.' : '🛍️ اطلب الآن قبل انتهاء التوفر.',
       store ? `🏪 ${store}` : '',
+      category ? `🧺 القسم: ${category}` : '',
+      location ? `📍 ${location}` : '',
       phone ? `📲 🚚 اطلب الآن عبر خدمة التوصيل: ${phone}` : '',
     ].filter(Boolean).join('\n\n'), 620);
   }
@@ -272,6 +280,8 @@ export function formatMarketingTextForWhatsApp(
     quantity ? `📦 *الكمية المتاحة:* ${quantity}` : '',
     resolved.goal === 'inquiry' ? '💬 راسلنا للاستفسار والتفاصيل.' : resolved.goal === 'showcase' ? '👀 اكتشف التفاصيل واختر ما يناسبك.' : '🛍️ اطلب الآن قبل انتهاء التوفر.',
     store ? `🏪 *${store}*` : '',
+    category ? `🧺 *القسم:* ${category}` : '',
+    location ? `📍 ${location}` : '',
     phone ? `📲 🚚 اطلب الآن عبر خدمة التوصيل: ${phone}` : '',
   ].filter(Boolean);
   return sanitizeWhatsAppText(lines.join('\n\n'), 620);

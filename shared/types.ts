@@ -35,6 +35,8 @@ export interface AdDetails {
   features: string[];
   storeName: string;
   storePhone: string;
+  storeLocation?: string;
+  storeCategory?: string;
   marketingText: string;
   marketingPreferences?: MarketingTextPreferences;
   marketingTextEngine?: MarketingTextEngine;
@@ -478,6 +480,8 @@ export const DEFAULT_AD_DETAILS: AdDetails = {
   features: [],
   storeName: '',
   storePhone: '',
+  storeLocation: '',
+  storeCategory: '',
   marketingText: '',
   marketingPreferences: {
     tone: 'persuasive',

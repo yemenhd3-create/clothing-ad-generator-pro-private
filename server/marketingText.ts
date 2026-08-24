@@ -40,6 +40,8 @@ function buildMarketingPrompt(details: AdDetails, preferences: MarketingTextPref
       quantity: details.quantity,
       storeName: details.storeName,
       storePhone: details.storePhone,
+      storeLocation: details.storeLocation,
+      storeCategory: details.storeCategory,
     },
     preferences,
     copyVariant: variant,

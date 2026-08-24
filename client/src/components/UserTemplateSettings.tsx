@@ -1,8 +1,10 @@
 import type { ProductShadowPreset, ProductStudioBackdrop, TemplateBadgeType, TemplateSettings, TemplateSize, TemplateVisualTheme } from '@shared/types';
 import { TEMPLATE_THEME_LIST, getTemplateTheme } from '@shared/templateThemes';
-import { ArrowRight, Check, CheckCircle2, ChevronDown, ChevronLeft, CircleHelp, ImagePlus, LayoutTemplate, MonitorSmartphone, Palette, Settings2, Sparkles, Store, Tag, Wrench } from 'lucide-react';
+import type { MerchantProfile } from '@shared/merchantAssistant';
+import { ArrowRight, Check, CheckCircle2, ChevronDown, ChevronLeft, CircleHelp, ImagePlus, LayoutTemplate, MonitorSmartphone, Moon, Palette, RotateCcw, Settings2, Sparkles, Store, Sun, Tag, Wrench } from 'lucide-react';
 import * as React from 'react';
 import { useState } from 'react';
+import { useOptionalTheme } from '@/contexts/ThemeContext';
 import { PRACTICAL_HEADER_RATIO } from '@/lib/brandArtworkSupport';
 import ArtworkPositionEditor from './ArtworkPositionEditor';
 import ArtworkCropEditor from './ArtworkCropEditor';
@@ -13,6 +15,9 @@ interface UserTemplateSettingsProps {
   onBack: () => void;
   onAbout: () => void;
   onDeveloper?: () => void;
+  profile?: MerchantProfile;
+  onProfileChange?: (profile: MerchantProfile) => void;
+  onRestoreNormal?: () => void;
 }
 
 type ToggleKey = 'showProductName' | 'showHeadline' | 'showDiscount' | 'showQuantity' | 'showColors' | 'showFeatures' | 'showPrice' | 'showStoreInfo' | 'showQualityMark';
@@ -88,7 +93,8 @@ function ToggleRow({ item, active, onToggle }: { item: { key: ToggleKey; title: 
   </button>;
 }
 
-export default function UserTemplateSettings({ settings, onChange, onBack, onAbout, onDeveloper }: UserTemplateSettingsProps) {
+export default function UserTemplateSettings({ settings, onChange, onBack, onAbout, onDeveloper, profile, onProfileChange, onRestoreNormal }: UserTemplateSettingsProps) {
+  const { theme, setTheme } = useOptionalTheme();
   const [artworkError, setArtworkError] = useState('');
   const [isSaved, setIsSaved] = useState(false);
   const [openCard, setOpenCard] = useState<SettingsCardKey>('size');
@@ -121,6 +127,10 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
     updateSettings(pendingArtwork.kind === 'logo' ? { ...settings, storeLogoArtwork: value, showStoreLogo: true } : { ...settings, footerArtwork: value, showFooterArtwork: true });
     setPendingArtwork(null);
   };
+  const updateProfile = (patch: Partial<MerchantProfile>) => {
+    if (!profile || !onProfileChange) return;
+    onProfileChange({ ...profile, ...patch, onboardingComplete: true, updatedAt: Date.now() });
+  };
 
   return <section className="space-y-4" dir="rtl">
     <div className="reference-card p-5 sm:p-7">
@@ -148,8 +158,9 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
       <p className="mb-2 mt-4 text-xs font-black text-primary">ظل المنتج</p><div className="grid grid-cols-3 gap-2">{shadowOptions.map(option => <button key={option.value} type="button" onClick={() => updateSettings({ ...settings, productShadow: option.value })} className={`rounded-xl px-3 py-2 text-xs font-black transition active:scale-[.99] ${(settings.productShadow || 'soft') === option.value ? 'bg-primary text-white' : 'bg-white text-primary shadow-sm'}`}>{option.title}</button>)}</div>
     </SettingsCard>
 
-    <SettingsCard id="identity" icon={Store} title="هوية المتجر" summary={settings.storeLogoArtwork || settings.footerArtwork ? 'الشعار أو التذييل محفوظان ويمكن تعديلهما' : 'أضف شعاراً وتذييلاً اختياريين'} open={openCard === 'identity'} onToggle={() => setCard('identity')}>
-      <p className="text-xs leading-5 text-muted-foreground">يكفي رفع شعار المتجر وتذييل مصمم. يظهر التذييل شريطاً عريضاً كاملاً في أسفل الإعلان، من اليمين إلى اليسار.</p>
+    <SettingsCard id="identity" icon={Store} title="بيانات المركز والهوية" summary={profile?.storeName ? `${profile.storeName} · تُضاف للنص التسويقي تلقائياً` : settings.storeLogoArtwork || settings.footerArtwork ? 'الشعار أو التذييل محفوظان ويمكن تعديلهما' : 'أضف بيانات المركز والشعار والتذييل عند الحاجة'} open={openCard === 'identity'} onToggle={() => setCard('identity')}>
+      <p className="text-xs leading-5 text-muted-foreground">هذه البيانات لا تظهر فوق الصورة تلقائياً. يستخدمها النص التسويقي فقط، أما الشعار والتذييل فهما اختياريان داخل القالب.</p>
+      {profile && onProfileChange && <div className="mt-4 grid gap-3 rounded-2xl bg-white p-3 sm:grid-cols-2"><input value={profile.storeName} onChange={event => updateProfile({ storeName: event.target.value.slice(0, 80) })} className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm text-foreground outline-none focus:border-primary" placeholder="اسم المركز" aria-label="اسم المركز للنص التسويقي" /><input value={profile.storeCategory} onChange={event => updateProfile({ storeCategory: event.target.value.slice(0, 48) })} className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm text-foreground outline-none focus:border-primary" placeholder="نوع المبيعات: نسائي، رجالي…" aria-label="نوع مبيعات المركز" /><input value={profile.storePhone} inputMode="tel" onChange={event => updateProfile({ storePhone: event.target.value.slice(0, 32) })} className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm text-foreground outline-none focus:border-primary" placeholder="رقم الهاتف للتوصيل" aria-label="رقم الهاتف للتوصيل" /><input value={profile.storeLocation} onChange={event => updateProfile({ storeLocation: event.target.value.slice(0, 80) })} className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm text-foreground outline-none focus:border-primary" placeholder="العنوان — اختياري" aria-label="عنوان المركز" /><input value={profile.defaultDiscount || ''} inputMode="decimal" onChange={event => updateProfile({ defaultDiscount: event.target.value.replace(/[^0-9.]/g, '').slice(0, 16) })} className="min-h-11 rounded-xl border border-stone-200 px-3 text-sm text-foreground outline-none focus:border-primary" placeholder="الخصم الافتراضي % — اختياري" aria-label="الخصم الافتراضي" /><p style={{ alignSelf: 'center' }} className="text-xs leading-5 text-muted-foreground">احفظها مرة واحدة؛ عند تجهيز النص ستدخل تلقائياً، وتبقى حقول القطعة هي ما تغيّره كل مرة.</p></div>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="cursor-pointer rounded-2xl border border-primary/10 bg-white p-3 text-sm font-black text-primary transition hover:bg-primary/5 active:scale-[.99]"><span className="flex items-center gap-2"><ImagePlus size={17} />اختيار شعار المتجر</span><span className="mt-1 block text-[11px] font-medium text-muted-foreground">أي نسبة مناسبة؛ اضبط القص والاحتواء قبل الحفظ.</span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => selectArtwork('logo', event.target.files?.[0])} /></label>
         <label className="cursor-pointer rounded-2xl border border-primary/10 bg-white p-3 text-sm font-black text-primary transition hover:bg-primary/5 active:scale-[.99]"><span className="flex items-center gap-2"><LayoutTemplate size={17} />اختيار تذييل المتجر</span><span className="mt-1 block text-[11px] font-medium text-muted-foreground">أي نسبة مناسبة؛ اضبطه إلى 2688 × 494 قبل الحفظ.</span><input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => selectArtwork('footer', event.target.files?.[0])} /></label>
@@ -171,6 +182,8 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
     </SettingsCard>
 
     <SettingsCard id="help" icon={CircleHelp} title="المساعدة والتطبيق" summary="دليل الاستخدام، معلومات المشروع، ولوحة المطور المحمية" open={openCard === 'help'} onToggle={() => setCard('help')}>
+      <button type="button" onClick={() => setTheme?.(theme === 'dark' ? 'light' : 'dark')} className="flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}</span>{theme === 'dark' ? 'العودة للوضع الفاتح' : 'تفعيل الوضع الليلي'}<span style={{ marginRight: 'auto' }} className="text-[11px] text-muted-foreground">محفوظ على هذا الهاتف</span></button>
+      {onRestoreNormal && <button type="button" onClick={onRestoreNormal} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><RotateCcw size={18} />استعادة الوضع الطبيعي<span style={{ marginRight: 'auto' }} className="text-[11px] font-medium text-muted-foreground">لا يحذف الصور أو الحساب أو المفاتيح</span></button>}
       <button type="button" onClick={onAbout} className="flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><Sparkles size={18} />حول التطبيق وبيانات المطور</button>
       {onDeveloper && <button type="button" onClick={onDeveloper} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-primary/5 px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><Wrench size={18} />فتح لوحة المطور المحمية</button>}
       <button type="button" onClick={() => setPhoneChecklistVisible(value => !value)} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><MonitorSmartphone size={18} />اختبار الهاتف السريع</button>

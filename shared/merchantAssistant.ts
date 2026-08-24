@@ -32,6 +32,7 @@ export type MerchantProfile = {
   storePhone: string;
   storeLocation: string;
   storeCategory: string;
+  defaultDiscount?: string;
   preferredTheme?: TemplateVisualTheme;
   preferredProductScale?: number;
   marketingPreferences?: Partial<MarketingTextPreferences>;
@@ -163,6 +164,7 @@ export function createMerchantProfile(): MerchantProfile {
     storePhone: '',
     storeLocation: '',
     storeCategory: '',
+    defaultDiscount: '',
     defaultColors: [],
     hiddenElements: [],
     appliedCommandCount: 0,
@@ -189,6 +191,7 @@ export function normalizeMerchantProfile(value: unknown): MerchantProfile {
     storePhone: cleanText(source.storePhone, 32),
     storeLocation: cleanText(source.storeLocation),
     storeCategory: cleanText(source.storeCategory, 48),
+    defaultDiscount: cleanText(source.defaultDiscount, 32),
     preferredTheme: theme,
     preferredProductScale: Number.isFinite(scale) ? Math.min(PRODUCT_SCALE_MAX, Math.max(PRODUCT_SCALE_MIN, scale)) : undefined,
     marketingPreferences: normalizeMarketingPreferences(source.marketingPreferences),
@@ -200,6 +203,20 @@ export function normalizeMerchantProfile(value: unknown): MerchantProfile {
       'store-name-position': boundedCount(unsupported['store-name-position']) || undefined,
     },
     updatedAt: Number.isFinite(Number(source.updatedAt)) ? Number(source.updatedAt) : fallback.updatedAt,
+  };
+}
+
+/** يملأ النص التسويقي من بيانات المركز المحفوظة فقط عندما لا يكتب المستخدم قيمة أحدث. */
+export function applyMerchantProfileToMarketingDetails(details: AdDetails, profile: MerchantProfile): AdDetails {
+  const safe = normalizeMerchantProfile(profile);
+  return {
+    ...details,
+    storeName: cleanText(details.storeName) || safe.storeName,
+    storePhone: cleanText(details.storePhone, 32) || safe.storePhone,
+    storeLocation: cleanText(details.storeLocation) || safe.storeLocation,
+    storeCategory: cleanText(details.storeCategory, 48) || safe.storeCategory,
+    discount: cleanText(details.discount, 32) || cleanText(safe.defaultDiscount, 32),
+    colors: details.colors.length > 0 ? details.colors : safe.defaultColors,
   };
 }
 

@@ -221,7 +221,7 @@ describe('Home Try-On workflow', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'الإعدادات' })[0]);
     await screen.findByText('عدّل شكل الإعلان عند الحاجة');
-    fireEvent.click(screen.getByRole('button', { name: /هوية المتجر/ }));
+    fireEvent.click(screen.getByRole('button', { name: /بيانات المركز والهوية/ }));
     const inputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]');
     fireEvent.change(inputs[0], { target: { files: [new File(['logo'], 'trend-logo.png', { type: 'image/png' })] } });
     fireEvent.click(await screen.findByRole('button', { name: 'حفظ الشعار في المشروع' }));

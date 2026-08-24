@@ -37,11 +37,10 @@ describe('تنقل لوحة المطور الموحدة', () => {
     expect(screen.getByText('السجل التشخيصي')).toBeTruthy();
   });
 
-  it('يفعّل الوضع الليلي من قسم النظام ويحفظ الاختيار على الهاتف', async () => {
+  it('يبقي قسم النظام مخصصاً للسجل ولا يظهر تحكم مظهر المستخدم', async () => {
     render(<ThemeProvider switchable><DeveloperWorkspace onBack={vi.fn()} /></ThemeProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'النظام' }));
-    fireEvent.click(screen.getByRole('button', { name: 'تفعيل الوضع الليلي' }));
-    await waitFor(() => expect(document.documentElement.classList.contains('dark')).toBe(true));
-    expect(localStorage.getItem('theme')).toBe('dark');
+    await waitFor(() => expect(screen.getByText('السجل التشخيصي')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: /الوضع الليلي/ })).toBeNull();
   });
 });

@@ -40,7 +40,7 @@ import { getWardrobeShareText } from '@/lib/wardrobeShare';
 import { getWardrobeOverlayHelp } from '@/lib/wardrobeOverlayHelp';
 import { getFromStorage, removeFromStorage, saveToStorage } from '@/lib/storage';
 import { clearMerchantAssistantSession, clearMerchantProfile, loadMerchantAssistantSession, loadMerchantProfile, saveMerchantAssistantSession, saveMerchantProfile } from '@/lib/merchantMemory';
-import { applyMerchantCommands, type MerchantAssistantSession, type MerchantCommand, type MerchantProfile } from '@shared/merchantAssistant';
+import { applyMerchantCommands, applyMerchantProfileToMarketingDetails, type MerchantAssistantSession, type MerchantCommand, type MerchantProfile } from '@shared/merchantAssistant';
 import type { LocalProjectBackup } from '@/lib/localProjectBackup';
 import { trpc } from '@/lib/trpc';
 import { Slider } from '@/components/ui/slider';
@@ -698,12 +698,12 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
   const generateWardrobeMarketingText = async (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => {
     const caption = templateSettings.studioCaption?.trim() || '';
-    const generationDetails: AdDetails = {
+    const generationDetails: AdDetails = applyMerchantProfileToMarketingDetails({
       ...details,
       headline: [details.headline.trim(), caption].filter((value, index, values) => Boolean(value) && values.indexOf(value) === index).join(' — '),
       currency: details.currency.trim() || 'ريال',
       marketingText: '',
-    };
+    }, merchantProfile);
     const local = generateLocalMarketingText(generationDetails, preferences, variant);
     handleMarketingDetailsChange({ marketingText: local.text, marketingPreferences: preferences, marketingTextEngine: 'local' });
     if (friendTestMode || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
@@ -732,17 +732,23 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setCurrentStep('upload');
   };
 
-  const handleMerchantProfileCommit = (profile: MerchantProfile) => {
+  const persistMerchantProfile = (profile: MerchantProfile, announce: boolean) => {
     const stored = saveMerchantProfile(profile);
     setMerchantProfile(stored);
     setAdDetails(current => ({
       ...current,
       storeName: stored.storeName || current.storeName,
       storePhone: stored.storePhone || current.storePhone,
+      storeLocation: stored.storeLocation || current.storeLocation,
+      storeCategory: stored.storeCategory || current.storeCategory,
+      discount: stored.defaultDiscount || current.discount,
       colors: stored.defaultColors.length > 0 ? stored.defaultColors : current.colors,
     }));
-    toast.success('تم حفظ تفضيلات متجرك محلياً على هذا الهاتف.');
+    if (announce) toast.success('تم حفظ تفضيلات متجرك محلياً على هذا الهاتف.');
   };
+
+  const handleMerchantProfileCommit = (profile: MerchantProfile) => persistMerchantProfile(profile, true);
+  const handleMerchantProfileDraftChange = (profile: MerchantProfile) => persistMerchantProfile(profile, false);
 
   const handleMerchantProfileClear = () => {
     setMerchantProfile(clearMerchantProfile());
@@ -758,13 +764,34 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     toast.success('تم مسح سجل مهام المساعد من هذا الهاتف.');
   };
 
+  const restoreNormalMode = () => {
+    if (!window.confirm('سيعاد شكل القالب وتفضيلات التحسين إلى الوضع الطبيعي. لن نحذف صورة الملابس أو الإعلان الحالي أو بيانات المركز أو الحساب أو مفاتيح المطور. هل تريد المتابعة؟')) return;
+    setTemplateSettings(DEFAULT_TEMPLATE_SETTINGS);
+    setPreferenceProfile(clearPreferenceProfile());
+    setMerchantAssistantSession(clearMerchantAssistantSession());
+    setDesignSuggestion(null);
+    setTemplateBeforeSuggestion(null);
+    setDesignBenchmarks([]);
+    setDesignRegression(null);
+    setDesignHistory(null);
+    setDesignRedoEntries([]);
+    setQualityGateReport(null);
+    setDesignContractReport(null);
+    setActiveWardrobeTool(null);
+    removeFromStorage(StorageKeys.TEMPLATE_SETTINGS);
+    removeFromStorage(StorageKeys.DESIGN_HISTORY);
+    removeFromStorage(StorageKeys.DESIGN_SUGGESTION);
+    removeFromStorage(StorageKeys.DESIGN_QUALITY_BASELINE);
+    toast.success('عاد القالب وتفضيلات التحسين إلى الوضع الطبيعي. بقيت صورتك وبيانات مركزك ومفاتيح المطور كما هي.');
+  };
+
   const handleLocalProjectBackupRestore = (backup: LocalProjectBackup) => {
     const restoredProfile = saveMerchantProfile(backup.profile);
     const restoredSession = saveMerchantAssistantSession(backup.session);
     setMerchantProfile(restoredProfile);
     setMerchantAssistantSession(restoredSession);
     setTemplateSettings({ ...DEFAULT_TEMPLATE_SETTINGS, ...backup.template });
-    setAdDetails(current => ({ ...current, storeName: restoredProfile.storeName || current.storeName, storePhone: restoredProfile.storePhone || current.storePhone, colors: restoredProfile.defaultColors.length ? restoredProfile.defaultColors : current.colors }));
+    setAdDetails(current => ({ ...current, storeName: restoredProfile.storeName || current.storeName, storePhone: restoredProfile.storePhone || current.storePhone, storeLocation: restoredProfile.storeLocation || current.storeLocation, storeCategory: restoredProfile.storeCategory || current.storeCategory, discount: restoredProfile.defaultDiscount || current.discount, colors: restoredProfile.defaultColors.length ? restoredProfile.defaultColors : current.colors }));
     toast.success('استعدنا إعدادات القالب وذاكرة القائد من النسخة المحلية.');
   };
 
@@ -1167,6 +1194,9 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
             onBack={() => setActiveView('create')}
             onAbout={() => setActiveView('about')}
             onDeveloper={friendTestMode ? undefined : () => setActiveView('developer')}
+            profile={merchantProfile}
+            onProfileChange={handleMerchantProfileDraftChange}
+            onRestoreNormal={restoreNormalMode}
           /></React.Suspense>)}
 
         {activeView === 'assistant' && <React.Suspense fallback={<PageLoading label="جارٍ فتح القائد المحلي…" />}><MerchantAssistantWorkspace profile={merchantProfile} session={merchantAssistantSession} template={templateSettings} onCommitProfile={handleMerchantProfileCommit} onCommitSession={handleMerchantAssistantSessionCommit} onApplyCommands={handleMerchantCommands} onApplyArtwork={handleMerchantArtwork} onRequestOnlineReply={friendTestMode ? undefined : (message) => connectedLeaderMutation.mutateAsync({ message })} onRestoreBackup={handleLocalProjectBackupRestore} onClearProfile={handleMerchantProfileClear} onClearSession={handleMerchantAssistantSessionClear} onOpenUpdatedResult={() => { setActiveView('create'); setCurrentStep('final'); }} /></React.Suspense>}
@@ -1411,7 +1441,26 @@ function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGene
   const lengthOptions: Array<[MarketingTextLength, string]> = [['short', 'أساسي'], ['medium', 'متوسط'], ['long', 'كبير']];
   const emphasisOptions = Object.entries(MARKETING_TEXT_EMPHASIS_LABELS) as Array<[MarketingTextEmphasis, string]>;
 
-  return <div><p className="mb-2 text-[11px] font-bold text-muted-foreground">اكتب الاسم والسعر فقط. لا يظهران داخل الصورة.</p><div className="grid grid-cols-2 gap-2"><input value={details.productName} disabled={disabled} onChange={event => updateDetails({ productName: event.target.value })} placeholder="اسم القطعة" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="اسم القطعة للنص التسويقي" /><input value={details.price} disabled={disabled} inputMode="numeric" onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })} placeholder="السعر (اختياري)" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="السعر للنص التسويقي" /></div><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={disabled || isGenerating} onClick={() => void generate()} className="reference-primary w-full">{isGenerating ? <><LoaderCircle className="animate-spin" size={16} />جارٍ التجهيز…</> : <><MessageSquareText size={16} />جهّز النص</>}</button><button type="button" disabled={disabled} onClick={() => setShowOptions(value => !value)} className="reference-outline w-full"><SlidersHorizontal size={16} />خيارات</button></div>{showOptions && <div className="mt-2 rounded-xl bg-secondary/70 p-2"><div className="grid grid-cols-2 gap-2"><select value={preferences.campaign} disabled={disabled} onChange={event => updatePreferences({ campaign: event.target.value as MarketingTextCampaign })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="أسلوب النص التسويقي">{campaignOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><select value={preferences.length} disabled={disabled} onChange={event => updatePreferences({ length: event.target.value as MarketingTextLength })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="حجم النص التسويقي">{lengthOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><select value={preferences.emphasis} disabled={disabled} onChange={event => updatePreferences({ emphasis: event.target.value as MarketingTextEmphasis, format: 'whatsapp' })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="تنسيق نص واتساب">{emphasisOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><input value={details.storePhone} disabled={disabled} inputMode="tel" onChange={event => updateDetails({ storePhone: event.target.value })} placeholder="رقم التوصيل" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="رقم التوصيل وواتساب" /></div><div className="mt-2 grid grid-cols-2 gap-2"><input value={details.quantity} disabled={disabled} onChange={event => updateDetails({ quantity: event.target.value })} placeholder="الكمية (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الكمية المتاحة" /><input value={details.discount} disabled={disabled} inputMode="decimal" onChange={event => updateDetails({ discount: event.target.value })} placeholder="الخصم (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الخصم" /></div></div>}{notice && <p className="mt-2 text-[10px] leading-4 text-muted-foreground" aria-live="polite">{notice}</p>}</div>;
+  return <div>
+    <p className="mb-2 text-[11px] font-bold text-muted-foreground">اكتب اسم القطعة والكمية فقط. بيانات المركز المحفوظة تدخل تلقائياً ولا تظهر داخل الصورة.</p>
+    <div className="grid grid-cols-2 gap-2">
+      <input value={details.productName} disabled={disabled} onChange={event => updateDetails({ productName: event.target.value })} placeholder="اسم القطعة" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="اسم القطعة للنص التسويقي" />
+      <input value={details.quantity} disabled={disabled} onChange={event => updateDetails({ quantity: event.target.value })} placeholder="الكمية (اختياري)" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="الكمية المتاحة" />
+    </div>
+    <div className="mt-2 grid grid-cols-2 gap-2">
+      <button type="button" disabled={disabled || isGenerating} onClick={() => void generate()} className="reference-primary w-full">{isGenerating ? <><LoaderCircle className="animate-spin" size={16} />جارٍ التجهيز…</> : <><MessageSquareText size={16} />جهّز النص</>}</button>
+      <button type="button" disabled={disabled} onClick={() => setShowOptions(value => !value)} className="reference-outline w-full"><SlidersHorizontal size={16} />خيارات</button>
+    </div>
+    {showOptions && <div className="mt-2 rounded-xl bg-secondary/70 p-2"><div className="grid grid-cols-2 gap-2">
+      <select value={preferences.campaign} disabled={disabled} onChange={event => updatePreferences({ campaign: event.target.value as MarketingTextCampaign })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="أسلوب النص التسويقي">{campaignOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+      <select value={preferences.length} disabled={disabled} onChange={event => updatePreferences({ length: event.target.value as MarketingTextLength })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="حجم النص التسويقي">{lengthOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+      <select value={preferences.emphasis} disabled={disabled} onChange={event => updatePreferences({ emphasis: event.target.value as MarketingTextEmphasis, format: 'whatsapp' })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="تنسيق نص واتساب">{emphasisOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+      <input value={details.price} disabled={disabled} inputMode="numeric" onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })} placeholder="السعر (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="السعر للنص التسويقي" />
+      <input value={details.storePhone} disabled={disabled} inputMode="tel" onChange={event => updateDetails({ storePhone: event.target.value })} placeholder="رقم التوصيل (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="رقم التوصيل وواتساب" />
+      <input value={details.discount} disabled={disabled} inputMode="decimal" onChange={event => updateDetails({ discount: event.target.value })} placeholder="الخصم (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الخصم" />
+    </div></div>}
+    {notice && <p className="mt-2 text-[10px] leading-4 text-muted-foreground" aria-live="polite">{notice}</p>}
+  </div>;
 }
 
 function FloatingOverlayEditor({ settings, disabled, onChange, onLayerChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void; onLayerChange: (layer: 'caption' | 'price') => void }) {
