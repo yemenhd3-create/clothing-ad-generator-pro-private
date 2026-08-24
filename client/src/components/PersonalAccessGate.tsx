@@ -10,7 +10,8 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
   const { isAuthenticated, loading } = useAuth();
   const accessQuery = trpc.personal.access.useQuery(undefined, {
     enabled: isAuthenticated,
-    retry: false,
+    retry: 1,
+    retryDelay: 700,
     refetchOnWindowFocus: false,
   });
 
@@ -29,8 +30,12 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
     );
   }
 
-  if (accessQuery.error || accessQuery.data?.isDisabled) {
+  if (accessQuery.data?.isDisabled) {
     return <AccessShell icon={<ShieldAlert size={30} />} title="الوصول موقوف حالياً" description="هذا الحساب لا يستطيع استخدام مساحة المشروع الآن. راجع المطور من جهازه أو حسابه المصرح به لإعادة التفعيل." />;
+  }
+
+  if (accessQuery.error) {
+    return <AccessShell icon={<ShieldAlert size={30} />} title="تعذر التحقق من الوصول مؤقتاً" description="لا يعني هذا أن حسابك حُذف. تحقق من الإنترنت ثم أعد المحاولة؛ يبقى حسابك ورمزك محفوظين." action={<button type="button" onClick={() => void accessQuery.refetch()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground transition active:scale-[0.98]"><LogIn size={19} />إعادة التحقق</button>} />;
   }
 
   return <>{children}</>;
@@ -38,12 +43,20 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
 
 function AccessCodeEntry({ onPlatformLogin }: { onPlatformLogin: () => void }) {
   const [code, setCode] = useState('');
+  const [entryError, setEntryError] = useState('');
   const redeem = trpc.accessCodes.redeem.useMutation({
     onSuccess: () => window.location.reload(),
-    onError: error => toast.error(error.message || 'تعذر التحقق من رمز الدخول.'),
+    onError: error => {
+      const message = /network|fetch|اتصال|networkerror/i.test(error.message || '')
+        ? 'تعذر الاتصال مؤقتاً. تحقق من الإنترنت ثم حاول من جديد.'
+        : 'تعذر التحقق من الرمز. راجع الرمز أو جرب الحساب المعتاد.';
+      setEntryError(message);
+      toast.error(message);
+    },
   });
   const submit = () => {
     if (!code.trim()) return toast.error('أدخل رمز الدخول أولاً.');
+    setEntryError('');
     redeem.mutate({ code: code.trim() });
   };
 
@@ -51,6 +64,7 @@ function AccessCodeEntry({ onPlatformLogin }: { onPlatformLogin: () => void }) {
     <label className="sr-only" htmlFor="access-code">رمز الدخول</label>
     <input id="access-code" value={code} onChange={event => setCode(event.target.value.toUpperCase())} onKeyDown={event => { if (event.key === 'Enter') submit(); }} autoCapitalize="characters" autoCorrect="off" placeholder="مثال: CAG-ABCDE-12345" className="min-h-12 w-full rounded-2xl border border-stone-200 px-4 text-center font-bold outline-none focus:border-primary" dir="ltr" />
     <button type="button" disabled={redeem.isPending} onClick={submit} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground transition active:scale-[0.98] disabled:opacity-50"><KeyRound size={20} />{redeem.isPending ? 'جارٍ التحقق…' : 'الدخول بالرمز'}</button>
+    {entryError && <p className="rounded-xl bg-secondary px-3 py-2 text-xs leading-5 text-muted-foreground" aria-live="polite">{entryError}</p>}
     <button type="button" onClick={onPlatformLogin} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-stone-200 px-5 text-sm font-black text-primary transition active:scale-[0.98]"><LogIn size={18} />متابعة بالحساب المعتاد</button>
   </div>;
 }
