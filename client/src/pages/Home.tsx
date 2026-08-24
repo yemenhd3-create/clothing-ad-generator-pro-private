@@ -1143,9 +1143,11 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
   const currentIndex = WORKFLOW_STEPS.findIndex(step => step.id === currentStep);
   const isWardrobeStudio = WARDROBE_ROOM_MODE && activeView === 'create' && currentStep === 'final';
+  const mobileShellStyle = WARDROBE_ROOM_MODE ? { minHeight: '100svh', height: '100svh', overflow: 'hidden', background: 'var(--card)' } : undefined;
+  const mobileMainStyle = WARDROBE_ROOM_MODE ? (isWardrobeStudio ? { minHeight: 0, background: 'var(--card)' } : { minHeight: 0, background: 'var(--card)', overscrollBehavior: 'contain', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }) : undefined;
 
   return (
-    <div className="reference-shell flex min-h-screen flex-col text-foreground" data-mobile-app-shell style={WARDROBE_ROOM_MODE ? { minHeight: '100svh', height: '100svh', overflow: 'hidden' } : undefined} dir="rtl">
+    <div className="reference-shell flex min-h-screen flex-col text-foreground" data-mobile-app-shell style={mobileShellStyle} dir="rtl">
       <header className="sticky top-0 z-20 border-b bg-white backdrop-blur-xl" style={{ backgroundColor: 'var(--card)' }}>
         <div className="mx-auto grid max-w-2xl grid-cols-[44px_minmax(0,1fr)_48px] items-center gap-3 px-4 py-3">
           {WARDROBE_ROOM_MODE && currentStep === 'final' && activeView === 'create' ? <button type="button" onClick={returnToImagePicker} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="اختيار صورة جديدة"><ArrowRight size={20} /></button> : friendTestMode || WARDROBE_ROOM_MODE ? <span className="h-11 w-11" aria-hidden="true" /> : <button type="button" onClick={() => setActiveView('messages')} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="رسائل المشروع"><MessageCircle size={20} /></button>}
@@ -1154,7 +1156,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         </div>
       </header>
 
-      <main className={`mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 ${WARDROBE_ROOM_MODE ? (isWardrobeStudio ? 'overflow-hidden py-2' : 'overflow-y-auto py-3') : 'pb-32 pt-5 sm:pt-8'}`} style={WARDROBE_ROOM_MODE ? (isWardrobeStudio ? { minHeight: 0 } : { minHeight: 0, overscrollBehavior: 'contain', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }) : undefined}>
+      <main className={`mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 ${WARDROBE_ROOM_MODE ? (isWardrobeStudio ? 'overflow-hidden py-2' : 'overflow-y-auto py-3') : 'pb-32 pt-5 sm:pt-8'}`} style={mobileMainStyle}>
         {activeView === 'create' && !WARDROBE_ROOM_MODE && <PwaInstallPrompt />}
 
         {activeView === 'create' && !WARDROBE_ROOM_MODE && <section className={`reference-card mb-6 p-4 ${currentStep === 'upload' ? 'hidden' : ''}`}>
@@ -1207,9 +1209,11 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         {!friendTestMode && activeView === 'messages' && <React.Suspense fallback={<PageLoading label="جارٍ فتح الرسائل…" />}><PersonalMessageCenter onBack={() => setActiveView('create')} /></React.Suspense>}
 
         {activeView === 'about' && (
-          <React.Suspense fallback={<PageLoading label="جارٍ فتح حول التطبيق…" />}>
-            <AboutApp onBack={() => setActiveView('settings')} />
-          </React.Suspense>
+          <div style={WARDROBE_ROOM_MODE ? { display: 'flex', flex: 1, minHeight: 0 } : undefined}>
+            <React.Suspense fallback={<PageLoading label="جارٍ فتح حول التطبيق…" />}>
+              <AboutApp onBack={() => setActiveView('settings')} />
+            </React.Suspense>
+          </div>
         )}
 
         {!friendTestMode && activeView === 'developer' && (
@@ -1223,7 +1227,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         )}
 
         {activeView === 'create' && currentStep === 'upload' && (
-          <section className="reference-card p-5 sm:p-7">
+          <section className={`reference-card p-5 sm:p-7 ${WARDROBE_ROOM_MODE ? 'flex flex-1 flex-col' : ''}`} style={WARDROBE_ROOM_MODE ? { minHeight: 0 } : undefined}>
             <div className="mb-6">
               <span className="mb-3 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"><ImagePlus size={15} />صورة الاستديو تبدأ هنا</span>
               <h2 className="text-2xl font-black text-primary">ضع قطعة الملابس في غرفة الاستديو</h2>
@@ -1242,16 +1246,18 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               <button type="button" onClick={discardRestoredDraft} className="shrink-0 rounded-xl bg-white px-3 py-2 text-xs font-black text-primary shadow-sm transition active:scale-95">بدء جديد</button>
             </div>}
             {isReviewingImage && productImage ? (
-              <div className="space-y-4">
+              <div className={WARDROBE_ROOM_MODE ? 'flex flex-1 flex-col justify-center space-y-4' : 'space-y-4'}>
                 <SingleImageReview simple={WARDROBE_ROOM_MODE} image={productImage} suggestion={designSuggestion} comparisonPreviews={comparisonPreviews} isDesignAnalyzing={isDesignAnalyzing} localPreparation={localPreparation} benchmarks={designBenchmarks} regression={designRegression} selectedSize={selectedSuggestedSize} currentSize={templateSettings.size} preferenceEnabled={preferenceProfile.enabled} accepted={Boolean(templateBeforeSuggestion)} onSelectSize={setSelectedSuggestedSize} onAcceptSuggestion={acceptDesignSuggestion} onIgnoreSuggestion={ignoreDesignSuggestion} onUndoSuggestion={undoDesignSuggestion} onTogglePreferences={() => setPreferenceProfile(current => setPreferenceEnabled(current, !current.enabled))} onClearPreferences={() => { setPreferenceProfile(clearPreferenceProfile()); toast.success('تم مسح تفضيلات المصمم من هذا الهاتف.'); }} onImageSelect={handleImageSelect} onImageRemove={handleImageRemove} onContinue={() => { setIsReviewingImage(false); if (WARDROBE_ROOM_MODE) void generateAd(); else { setCurrentStep('details'); toast.success('الصورة جاهزة. أضف بيانات الإعلان التي تريدها.'); } }} />
                 {!WARDROBE_ROOM_MODE && !friendTestMode && <TryOnOptIn isRunning={isTryOnRunning} preview={tryOnPreview} onRequest={handleTryOnRequest} onCancel={handleTryOnCancel} onAcceptPreview={handleTryOnAccept} onRejectPreview={handleTryOnReject} />}
               </div>
             ) : (
-              <ImageUploader
-                onImageSelect={handleImageSelect}
-                currentImage={productImage}
-                onImageRemove={handleImageRemove}
-              />
+              <div className={WARDROBE_ROOM_MODE ? 'flex flex-1 flex-col justify-center' : undefined}>
+                <ImageUploader
+                  onImageSelect={handleImageSelect}
+                  currentImage={productImage}
+                  onImageRemove={handleImageRemove}
+                />
+              </div>
             )}
           </section>
         )}

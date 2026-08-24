@@ -9,6 +9,9 @@ describe('about application screen', () => {
 
     expect(html).toContain('المهندس مروان داغس');
     expect(html).toContain('770976559');
+    expect(html).toContain('https://wa.me/967770976559');
+    expect(html).toContain('واتساب للتواصل');
+    expect(html).not.toContain('GitHub والبريد');
     expect(html).toContain('yemenhd3-create');
   });
 });
