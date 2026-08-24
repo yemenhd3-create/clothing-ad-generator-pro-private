@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "space.manus.clothgenpro_tjswxvvy.twa",
+      "sha256_cert_fingerprints": [
+        "31:3C:55:78:87:E2:5D:51:11:D7:C3:75:99:DD:36:27:96:BD:A6:02:61:CE:62:1E:93:B5:85:D6:8A:1D:A2:29"
+      ]
+    }
+  }
+]
