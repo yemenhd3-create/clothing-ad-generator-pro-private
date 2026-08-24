@@ -91,6 +91,8 @@ describe('Home Try-On workflow', () => {
   it('يعرض وصولاً مباشراً إلى إعدادات الإعلان ولوحة المطور من أيقونة الرأس', async () => {
     render(createElement(Home));
 
+    expect(document.querySelector('[data-mobile-app-shell]')).toBeTruthy();
+    expect(document.querySelector('main')?.className).toContain('flex-1');
     fireEvent.click(screen.getByRole('button', { name: 'الإعدادات والوصول للمطور' }));
 
     expect(await screen.findByRole('button', { name: 'إعدادات الإعلان' })).toBeTruthy();

@@ -116,7 +116,7 @@
   }
 
   .reference-card {
-    @apply rounded-[28px] border border-[#ebe7f0] bg-white shadow-[0_10px_28px_rgba(50,34,99,0.055)];
+    @apply rounded-[28px] border border-[#ebe7f0] bg-card text-card-foreground shadow-[0_10px_28px_rgba(50,34,99,0.055)];
   }
 
   .reference-icon {
@@ -221,16 +221,8 @@
   }
 
   /* Utilities */
-  .text-truncate {
-    @apply truncate;
-  }
-
   .line-through {
     @apply line-through;
-  }
-
-  .opacity-disabled {
-    @apply opacity-50 cursor-not-allowed;
   }
 
   /* Animations */

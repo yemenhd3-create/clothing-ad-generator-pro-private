@@ -1142,10 +1142,11 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   };
 
   const currentIndex = WORKFLOW_STEPS.findIndex(step => step.id === currentStep);
+  const isWardrobeStudio = WARDROBE_ROOM_MODE && activeView === 'create' && currentStep === 'final';
 
   return (
-    <div className="reference-shell min-h-screen text-foreground" dir="rtl">
-      <header className="sticky top-0 z-20 border-b bg-white backdrop-blur-xl">
+    <div className="reference-shell flex min-h-screen flex-col text-foreground" data-mobile-app-shell style={WARDROBE_ROOM_MODE ? { minHeight: '100svh', height: '100svh', overflow: 'hidden' } : undefined} dir="rtl">
+      <header className="sticky top-0 z-20 border-b bg-white backdrop-blur-xl" style={{ backgroundColor: 'var(--card)' }}>
         <div className="mx-auto grid max-w-2xl grid-cols-[44px_minmax(0,1fr)_48px] items-center gap-3 px-4 py-3">
           {WARDROBE_ROOM_MODE && currentStep === 'final' && activeView === 'create' ? <button type="button" onClick={returnToImagePicker} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="اختيار صورة جديدة"><ArrowRight size={20} /></button> : friendTestMode || WARDROBE_ROOM_MODE ? <span className="h-11 w-11" aria-hidden="true" /> : <button type="button" onClick={() => setActiveView('messages')} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/15 bg-white text-primary shadow-sm transition active:scale-95" aria-label="رسائل المشروع"><MessageCircle size={20} /></button>}
           <div className="flex min-w-0 items-center justify-center gap-2 text-center"><img src={LOGO_URL} alt="" className="h-8 w-8 shrink-0 object-contain" /><div className="min-w-0"><h1 className="text-[15px] font-black leading-5 tracking-tight text-primary sm:text-xl">غرفة الملابس</h1><p className="mt-0.5 truncate text-[10px] font-bold text-muted-foreground">ارفع القطعة ثم اختر شكلها</p></div></div>
@@ -1153,7 +1154,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         </div>
       </header>
 
-      <main className={`mx-auto w-full max-w-2xl px-4 ${WARDROBE_ROOM_MODE ? 'overflow-hidden py-3' : 'pb-32 pt-5 sm:pt-8'}`} style={WARDROBE_ROOM_MODE ? { height: 'calc(100svh - 4.75rem)' } : undefined}>
+      <main className={`mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 ${WARDROBE_ROOM_MODE ? (isWardrobeStudio ? 'overflow-hidden py-2' : 'overflow-y-auto py-3') : 'pb-32 pt-5 sm:pt-8'}`} style={WARDROBE_ROOM_MODE ? (isWardrobeStudio ? { minHeight: 0 } : { minHeight: 0, overscrollBehavior: 'contain', paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }) : undefined}>
         {activeView === 'create' && !WARDROBE_ROOM_MODE && <PwaInstallPrompt />}
 
         {activeView === 'create' && !WARDROBE_ROOM_MODE && <section className={`reference-card mb-6 p-4 ${currentStep === 'upload' ? 'hidden' : ''}`}>
@@ -1288,8 +1289,8 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         )}
 
         {activeView === 'create' && currentStep === 'final' && (
-          <section className={WARDROBE_ROOM_MODE ? '' : 'space-y-5'}>
-            <div className={`reference-card ${WARDROBE_ROOM_MODE ? 'p-3' : 'p-5 sm:p-7'}`} style={WARDROBE_ROOM_MODE ? { height: 'calc(100svh - 7.5rem)' } : undefined}>
+          <section className={WARDROBE_ROOM_MODE ? '' : 'space-y-5'} style={WARDROBE_ROOM_MODE ? { height: '100%', minHeight: 0 } : undefined}>
+            <div className={`reference-card ${WARDROBE_ROOM_MODE ? 'p-2' : 'p-5 sm:p-7'}`} style={WARDROBE_ROOM_MODE ? { height: '100%', minHeight: 0, border: 'none', background: 'transparent', boxShadow: 'none' } : undefined}>
               {!WARDROBE_ROOM_MODE && <div className="mb-5 flex items-start justify-between gap-3">
                 <div>
                   <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><BadgeCheck size={15} /> {WARDROBE_ROOM_MODE ? 'صورة الاستديو جاهزة' : 'الإعلان جاهز'}</span>
@@ -1316,10 +1317,10 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               )}
 
               {!isGenerating && generatedAd && WARDROBE_ROOM_MODE && (
-                <div className="flex h-full min-h-0 flex-col" aria-label="مساحة عمل غرفة الملابس">
-                  <div className="relative flex min-h-0 flex-1 flex-col" aria-label="القالب ثابت وأدوات عائمة" onPointerDown={handleWardrobeWorkspacePointerDown}>
+                <div className="flex flex-col" style={{ height: '100%', minHeight: 0 }} aria-label="مساحة عمل غرفة الملابس">
+                  <div className="relative flex flex-1 flex-col" style={{ minHeight: 0 }} aria-label="القالب ثابت وأدوات عائمة" onPointerDown={handleWardrobeWorkspacePointerDown}>
                     <div className="flex items-center justify-between gap-2 px-1 pb-2"><button type="button" onClick={returnToImagePicker} className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-primary/15 bg-white px-2 text-[11px] font-black text-primary active:scale-95"><ArrowRight size={15} />صورة جديدة</button><span className="text-[11px] font-bold text-muted-foreground">اضغط أداة واحدة</span></div>
-                    <div className="flex min-h-0 flex-1 items-center justify-center"><img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto w-full rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: 'calc(100svh - 15rem)' }} /></div>
+                    <div className="flex flex-1 items-center justify-center" style={{ minHeight: 0 }} aria-label="معاينة الإعلان داخل مساحة الهاتف"><img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: '100%', maxWidth: '100%', width: 'auto', height: 'auto' }} /></div>
                     {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} settings={templateSettings} details={adDetails} savedMarketingPreferences={merchantProfile.marketingPreferences} disabled={isGenerating} isMarketingGenerating={marketingTextMutation.isPending} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onMarketingChange={handleMarketingDetailsChange} onGenerateMarketing={generateWardrobeMarketingText} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
                     <WardrobeToolBar activeTool={activeWardrobeTool} onTool={tool => setActiveWardrobeTool(current => current === tool ? null : tool)} onDownload={handleDownload} onShareImage={() => void handleShareImageOnly()} onShareWhatsApp={() => void handleWhatsApp()} />
                   </div>

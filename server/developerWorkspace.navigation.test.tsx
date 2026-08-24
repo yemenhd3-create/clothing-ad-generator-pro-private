@@ -30,6 +30,7 @@ describe('تنقل لوحة المطور الموحدة', () => {
   it('يبدأ بالرئيسية ويتيح الوصول المباشر إلى المزودين والنظام', async () => {
     render(<ThemeProvider switchable><DeveloperWorkspace onBack={vi.fn()} /></ThemeProvider>);
 
+    expect(screen.getByLabelText('مساحة عمل لوحة المطور').getAttribute('style')).toContain('height: 100%');
     expect(screen.getByText('كل صلاحيات المطور هنا')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'المزودون' }));
     expect(await screen.findByText('إضافة مزود جديد')).toBeTruthy();

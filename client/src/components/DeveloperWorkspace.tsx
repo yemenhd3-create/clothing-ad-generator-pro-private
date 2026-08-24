@@ -64,16 +64,16 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   });
 
   if (statusQuery.isLoading) {
-    return <section className="rounded-[28px] bg-white p-8 text-center shadow-[0_16px_40px_rgba(37,35,95,0.08)]"><RefreshCw className="mx-auto animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">جارٍ التحقق من لوحة المطور…</p></section>;
+    return <section className="flex flex-col items-center justify-center rounded-[26px] border border-primary/10 bg-white p-8 text-center text-foreground shadow-[0_16px_40px_rgba(37,35,95,0.08)]" style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--card)' }}><RefreshCw className="mx-auto animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">جارٍ التحقق من لوحة المطور…</p></section>;
   }
 
   if (!isAuthenticated) {
     return (
-      <section className="rounded-[28px] bg-white p-5 shadow-[0_16px_40px_rgba(37,35,95,0.08)] sm:p-7" dir="rtl">
-        <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"><LockKeyhole size={15} /> مساحة خاصة</span>
+      <section className="flex flex-col rounded-[26px] border border-primary/10 bg-white p-5 text-foreground shadow-[0_16px_40px_rgba(37,35,95,0.08)] sm:p-7" style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--card)' }} dir="rtl" aria-label="مساحة دخول لوحة المطور">
+        <div><span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary"><LockKeyhole size={15} /> مساحة خاصة</span>
         <h2 className="mt-3 text-2xl font-black text-foreground">لوحة المطور</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">هذه المساحة مخصصة للمطور فقط. لا يستطيع المستخدم العادي رؤية مفاتيح الذكاء الاصطناعي أو تغييرها.</p>
-        <div className="mt-6 space-y-4">
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">هذه المساحة مخصصة للمطور فقط. لا يستطيع المستخدم العادي رؤية مفاتيح الذكاء الاصطناعي أو تغييرها.</p></div>
+        <div className="mt-6 flex flex-1 flex-col justify-center space-y-4" style={{ minHeight: 0 }}>
           <label className="block space-y-2"><span className="text-sm font-bold text-foreground">اسم المستخدم</span><Input className="h-12 rounded-2xl border-stone-200 px-4 text-right" value={username} onChange={event => setUsername(event.target.value)} autoComplete="username" /></label>
           <label className="block space-y-2"><span className="text-sm font-bold text-foreground">كلمة المرور</span><Input className="h-12 rounded-2xl border-stone-200 px-4 text-right" type="password" value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" onKeyDown={event => { if (event.key === 'Enter') loginMutation.mutate({ username, password }); }} /></label>
           {notice && <p className="rounded-xl bg-secondary p-3 text-sm font-medium text-primary">{notice}</p>}
@@ -85,8 +85,8 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <section className="space-y-5" dir="rtl">
-      <div className="rounded-[28px] bg-white p-5 shadow-[0_16px_40px_rgba(37,35,95,0.08)] sm:p-7">
+    <section className="flex flex-col rounded-[26px] border border-primary/10 bg-white p-3 text-foreground shadow-[0_16px_40px_rgba(37,35,95,0.08)]" style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--card)' }} dir="rtl" aria-label="مساحة عمل لوحة المطور">
+      <div className="rounded-2xl bg-secondary p-4 sm:p-5" style={{ opacity: .92 }}>
         <div className="flex items-start justify-between gap-3">
           <div><span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><Check size={15} /> جلسة مطور آمنة</span><h2 className="mt-3 text-2xl font-black text-foreground">لوحة المطور</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">اختر قسماً واحداً فقط. المفاتيح محفوظة مشفّرة ولا تظهر قيمتها بعد الحفظ.</p></div>
           <button type="button" onClick={() => logoutMutation.mutate()} className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary" aria-label="تسجيل الخروج"><LogOut size={19} /></button>
@@ -94,21 +94,23 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
         {notice && <p className="mt-5 rounded-xl bg-secondary p-3 text-sm font-medium text-primary">{notice}</p>}
       </div>
 
-      <nav className="flex gap-2 rounded-2xl border border-primary/10 bg-white p-2 shadow-sm" aria-label="أقسام لوحة المطور" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <nav className="mt-3 flex gap-2 rounded-2xl border border-primary/10 bg-white p-2 shadow-sm" aria-label="أقسام لوحة المطور" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', backgroundColor: 'var(--card)' }}>
         {DEVELOPER_SECTIONS.map(section => { const Icon = section.icon; const active = activeSection === section.id; return <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-pressed={active} style={{ minHeight: '2.75rem' }} className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-black transition active:scale-95 ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary/70 text-primary'}`}><Icon size={16} />{section.label}</button>; })}
       </nav>
 
-      {activeSection === 'overview' && <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7"><div className="flex items-center gap-2 text-primary"><ServerCog size={20} /><h3 className="font-black">كل صلاحيات المطور هنا</h3></div><p className="mt-2 text-sm leading-6 text-muted-foreground">استخدم الأزرار التالية للوصول المباشر. لا تحتاج إلى البحث في صفحة طويلة.</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setActiveSection('providers')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><ServerCog className="mb-1" size={18} />إضافة واختبار مزود</button><button type="button" onClick={() => setActiveSection('keys')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><KeyRound className="mb-1" size={18} />المفاتيح الخاصة</button><button type="button" onClick={() => setActiveSection('manage')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Power className="mb-1" size={18} />رموز الدخول والمستخدمون</button><button type="button" onClick={() => setActiveSection('system')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Settings className="mb-1" size={18} />الدخول والسجل</button></div></section>}
+      <div className="mt-3 flex-1 overflow-y-auto pb-3" style={{ minHeight: 0, overscrollBehavior: 'contain' }}>
+      {activeSection === 'overview' && <section className="rounded-[24px] bg-secondary p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7" style={{ minHeight: '100%', opacity: .82 }}><div className="flex items-center gap-2 text-primary"><ServerCog size={20} /><h3 className="font-black">كل صلاحيات المطور هنا</h3></div><p className="mt-2 text-sm leading-6 text-muted-foreground">استخدم الأزرار التالية للوصول المباشر. لا تحتاج إلى البحث في صفحة طويلة.</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setActiveSection('providers')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><ServerCog className="mb-1" size={18} />إضافة واختبار مزود</button><button type="button" onClick={() => setActiveSection('keys')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><KeyRound className="mb-1" size={18} />المفاتيح الخاصة</button><button type="button" onClick={() => setActiveSection('manage')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Power className="mb-1" size={18} />رموز الدخول والمستخدمون</button><button type="button" onClick={() => setActiveSection('system')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Settings className="mb-1" size={18} />الدخول والسجل</button></div></section>}
 
-      {activeSection === 'providers' && <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المزودين…</section>}><DeveloperProviderTools onDiagnostic={addDiagnostic} /></Suspense>}
-      {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
-      {activeSection === 'system' && <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
+      {activeSection === 'providers' && <Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المزودين…</section>}><DeveloperProviderTools onDiagnostic={addDiagnostic} /></Suspense>}
+      {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
+      {activeSection === 'system' && <section className="rounded-[24px] bg-secondary p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
         <div className="mb-4 flex items-center justify-between gap-3 text-primary"><div className="flex items-center gap-2"><KeyRound size={19} /><h3 className="font-black">السجل التشخيصي</h3></div><button type="button" onClick={() => setDiagnostics([])} className="text-xs font-bold text-muted-foreground">مسح السجل</button></div>
         {!diagnostics.length && <p className="rounded-2xl bg-secondary/70 p-4 text-sm text-muted-foreground">لا توجد أحداث في الجلسة الحالية.</p>}
         <div className="space-y-2">{diagnostics.map(entry => <div key={entry.id} className="flex items-start gap-3 rounded-2xl bg-secondary/60 p-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${entry.level === 'success' ? 'bg-emerald-500' : entry.level === 'error' ? 'bg-red-500' : 'bg-primary'}`} /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-foreground">{entry.message}</p><p className="mt-1 text-xs text-muted-foreground">{entry.at}</p></div></div>)}</div>
       </section>}
-      {activeSection === 'manage' && <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المساحة الشخصية…</section>}><DeveloperPersonalConsole /></Suspense>}
-      <button type="button" onClick={onBack} className="w-full py-2 text-sm font-bold text-muted-foreground">العودة إلى الإنشاء</button>
+      {activeSection === 'manage' && <Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المساحة الشخصية…</section>}><DeveloperPersonalConsole /></Suspense>}
+      </div>
+      <button type="button" onClick={onBack} className="shrink-0 w-full border-t border-primary/10 py-2 text-sm font-bold text-muted-foreground">العودة إلى الإنشاء</button>
     </section>
   );
 }
