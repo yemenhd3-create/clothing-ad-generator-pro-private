@@ -1,23 +1,12 @@
-import type { DeveloperProviderSummary } from '@shared/types';
-import { PERFECT_CORP_API_BASE_URL, PERFECT_CORP_BACKGROUND_REMOVE, PERFECT_CORP_BACKGROUND_REMOVE_NAME } from '@shared/providerPresets';
-import { CONNECTED_LEADER_PROVIDER_PRESETS } from '@shared/connectedLeaderPresets';
-import { Check, KeyRound, LockKeyhole, LogOut, Plus, Power, RefreshCw, ServerCog, Trash2 } from 'lucide-react';
-import { lazy, Suspense, useState } from 'react';
+import { Check, KeyRound, LockKeyhole, LogOut, Power, RefreshCw, ServerCog, Settings } from 'lucide-react';
+import React, { lazy, Suspense, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Input } from './ui/input';
 
 const DeveloperPersonalConsole = lazy(() => import('./DeveloperPersonalConsole'));
 const OpenImageModelsCatalog = lazy(() => import('./OpenImageModelsCatalog'));
 const PrivateKeyChat = lazy(() => import('./PrivateKeyChat'));
-
-type ProviderDraft = {
-  id?: string;
-  name: string;
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  enabled: boolean;
-};
+const DeveloperProviderTools = lazy(() => import('./DeveloperProviderTools'));
 
 type DiagnosticEntry = {
   id: string;
@@ -26,24 +15,15 @@ type DiagnosticEntry = {
   message: string;
 };
 
-const emptyDraft = (): ProviderDraft => ({
-  name: '',
-  baseUrl: '',
-  model: '',
-  apiKey: '',
-  enabled: true,
-});
+type DeveloperSection = 'overview' | 'providers' | 'keys' | 'manage' | 'system';
 
-function providerToDraft(provider: DeveloperProviderSummary): ProviderDraft {
-  return {
-    id: provider.id,
-    name: provider.name,
-    baseUrl: provider.baseUrl,
-    model: provider.model,
-    apiKey: '',
-    enabled: provider.enabled,
-  };
-}
+const DEVELOPER_SECTIONS: Array<{ id: DeveloperSection; label: string; icon: typeof ServerCog }> = [
+  { id: 'overview', label: 'الرئيسية', icon: ServerCog },
+  { id: 'providers', label: 'المزودون', icon: ServerCog },
+  { id: 'keys', label: 'المفاتيح', icon: KeyRound },
+  { id: 'manage', label: 'الإدارة', icon: Power },
+  { id: 'system', label: 'النظام', icon: Settings },
+];
 
 export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   const utils = trpc.useUtils();
@@ -51,14 +31,12 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
-  const [draft, setDraft] = useState<ProviderDraft>(emptyDraft);
+  const [activeSection, setActiveSection] = useState<DeveloperSection>('overview');
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([
     { id: 'workspace-opened', at: new Date().toLocaleTimeString('ar-YE'), level: 'info', message: 'تم فتح مساحة إدارة المطور.' },
   ]);
 
   const isAuthenticated = statusQuery.data?.authenticated === true;
-  const providersQuery = trpc.developer.providers.list.useQuery(undefined, { enabled: isAuthenticated });
-  const isFixedConnectedLeaderPreset = CONNECTED_LEADER_PROVIDER_PRESETS.some(preset => preset.model === draft.model);
 
   const addDiagnostic = (level: DiagnosticEntry['level'], message: string) => {
     setDiagnostics(current => [{ id: crypto.randomUUID(), at: new Date().toLocaleTimeString('ar-YE'), level, message }, ...current].slice(0, 12));
@@ -79,93 +57,11 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
 
   const logoutMutation = trpc.developer.logout.useMutation({
     onSuccess: async () => {
-      setDraft(emptyDraft());
       setNotice('تم إغلاق لوحة المطور.');
       addDiagnostic('info', 'تم إنهاء جلسة المطور.');
       await utils.developer.status.invalidate();
-      await utils.developer.providers.invalidate();
     },
   });
-
-  const saveMutation = trpc.developer.providers.save.useMutation({
-    onSuccess: async () => {
-      setDraft(emptyDraft());
-      setNotice('تم حفظ المزود. يبقى مفتاح API مشفراً على الخادم ولا يظهر مجدداً هنا.');
-      addDiagnostic('success', 'تم حفظ إعدادات المزود ومفتاحه بصورة مشفرة.');
-      await utils.developer.providers.invalidate();
-    },
-    onError: error => {
-      setNotice(error.message || 'تعذر حفظ المزود.');
-      addDiagnostic('error', 'تعذر حفظ إعدادات المزود.');
-    },
-  });
-
-  const toggleMutation = trpc.developer.providers.save.useMutation({
-    onSuccess: async provider => {
-      setNotice(provider.enabled ? 'تم تشغيل المزود. سيبقى المسار المحلي هو الافتراضي للمستخدم.' : 'تم إيقاف المزود مؤقتاً مع الاحتفاظ بإعداداته ومفتاحه المشفر.');
-      addDiagnostic('info', provider.enabled ? `تم تشغيل المزود ${provider.name}.` : `تم إيقاف المزود ${provider.name} مؤقتاً.`);
-      await utils.developer.providers.invalidate();
-    },
-    onError: error => {
-      setNotice(error.message || 'تعذر تغيير حالة المزود.');
-      addDiagnostic('error', 'تعذر تشغيل أو إيقاف المزود.');
-    },
-  });
-
-  const removeMutation = trpc.developer.providers.remove.useMutation({
-    onSuccess: async () => {
-      setNotice('تم حذف المزود.');
-      addDiagnostic('success', 'تم حذف المزود المحدد.');
-      await utils.developer.providers.invalidate();
-    },
-    onError: () => {
-      setNotice('تعذر حذف المزود.');
-      addDiagnostic('error', 'تعذر حذف المزود المحدد.');
-    },
-  });
-
-  const checkMutation = trpc.developer.providers.check.useMutation({
-    onSuccess: result => {
-      setNotice(result.message);
-      addDiagnostic(result.reachable ? 'success' : 'error', result.status ? `${result.message} (الحالة ${result.status})` : result.message);
-    },
-    onError: error => {
-      setNotice(error.message || 'تعذر اختبار المزود.');
-      addDiagnostic('error', 'تعذر تنفيذ اختبار اتصال المزود.');
-    },
-  });
-
-  const updateDraft = <K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) => {
-    setDraft(current => ({ ...current, [key]: value }));
-  };
-
-  const configurePerfectCorp = () => {
-    setDraft({
-      name: PERFECT_CORP_BACKGROUND_REMOVE_NAME,
-      baseUrl: PERFECT_CORP_API_BASE_URL,
-      model: PERFECT_CORP_BACKGROUND_REMOVE,
-      apiKey: '',
-      enabled: true,
-    });
-    setNotice('أدخل مفتاح Perfect Corp فقط ثم احفظ. رابط الخدمة والعملية ثُبتا تلقائياً لحمايتك من الخطأ.');
-  };
-
-  const configureConnectedLeader = (preset: typeof CONNECTED_LEADER_PROVIDER_PRESETS[number]) => {
-    setDraft({ name: preset.name, baseUrl: preset.baseUrl, model: preset.model, apiKey: '', enabled: true });
-    setNotice(`${preset.label} جاهز. أدخل مفتاحاً جديداً فقط ثم احفظ؛ لا يرسل هذا المسار الصور أو الشعار أو التذييل تلقائياً.`);
-  };
-
-  const submitProvider = () => {
-    setNotice('');
-    saveMutation.mutate({
-      id: draft.id,
-      name: draft.name,
-      baseUrl: draft.baseUrl,
-      model: draft.model,
-      apiKey: draft.apiKey || undefined,
-      enabled: draft.enabled,
-    });
-  };
 
   if (statusQuery.isLoading) {
     return <section className="rounded-[28px] bg-white p-8 text-center shadow-[0_16px_40px_rgba(37,35,95,0.08)]"><RefreshCw className="mx-auto animate-spin text-primary" /><p className="mt-3 text-sm text-muted-foreground">جارٍ التحقق من لوحة المطور…</p></section>;
@@ -192,41 +88,26 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
     <section className="space-y-5" dir="rtl">
       <div className="rounded-[28px] bg-white p-5 shadow-[0_16px_40px_rgba(37,35,95,0.08)] sm:p-7">
         <div className="flex items-start justify-between gap-3">
-          <div><span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><Check size={15} /> جلسة مطور آمنة</span><h2 className="mt-3 text-2xl font-black text-foreground">إدارة الذكاء الاصطناعي</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">تُحفظ المفاتيح مشفرة على الخادم؛ لا يعرض التطبيق قيمة مفتاح محفوظ سابقاً.</p></div>
+          <div><span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700"><Check size={15} /> جلسة مطور آمنة</span><h2 className="mt-3 text-2xl font-black text-foreground">لوحة المطور</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">اختر قسماً واحداً فقط. المفاتيح محفوظة مشفّرة ولا تظهر قيمتها بعد الحفظ.</p></div>
           <button type="button" onClick={() => logoutMutation.mutate()} className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-primary" aria-label="تسجيل الخروج"><LogOut size={19} /></button>
         </div>
         {notice && <p className="mt-5 rounded-xl bg-secondary p-3 text-sm font-medium text-primary">{notice}</p>}
       </div>
 
-      <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
-        <div className="mb-5 flex items-center justify-between gap-3 text-primary"><div className="flex items-center gap-2"><Plus size={19} /><h3 className="font-black">{draft.id ? 'تعديل مزود' : 'إضافة مزود جديد'}</h3></div><button type="button" onClick={configurePerfectCorp} className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-black text-primary">إعداد Perfect Corp</button></div>
-        <div className="mb-4 grid grid-cols-2 gap-3">{CONNECTED_LEADER_PROVIDER_PRESETS.map(preset => <button key={preset.id} type="button" onClick={() => configureConnectedLeader(preset)} className="rounded-xl bg-violet-50 px-3 py-2 text-right text-xs font-black text-primary"><span className="block">{preset.label}</span><span className="mt-1 block text-[10px] font-medium text-muted-foreground">بديل نصي فقط</span></button>)}</div>
-        <div className="space-y-4">
-          <label className="block space-y-2"><span className="text-sm font-bold">اسم المزود</span><Input className="h-11 rounded-xl" value={draft.name} onChange={event => updateDraft('name', event.target.value)} placeholder="مثال: FASHN" /></label>
-          <label className="block space-y-2"><span className="text-sm font-bold">رابط API</span><Input className="h-11 rounded-xl" dir="ltr" value={draft.baseUrl} onChange={event => updateDraft('baseUrl', event.target.value)} readOnly={draft.model === PERFECT_CORP_BACKGROUND_REMOVE || isFixedConnectedLeaderPreset} placeholder="https://api.example.com/v1" /></label>
-          <label className="block space-y-2"><span className="text-sm font-bold">اسم النموذج أو العملية</span><Input className="h-11 rounded-xl" dir="ltr" value={draft.model} onChange={event => updateDraft('model', event.target.value)} readOnly={draft.model === PERFECT_CORP_BACKGROUND_REMOVE || isFixedConnectedLeaderPreset} placeholder="product-to-model" /><span className="block text-xs leading-5 text-muted-foreground">للتلبيس اكتب <b dir="ltr">product-to-model</b>. ولـ PNG شفاف أضف مزوداً ثانياً باسم <b dir="ltr">background-remove</b>. استخدم زر <b>إعداد Perfect Corp</b> للمسار المخصص، ولا تكتب اسم عمليته يدوياً.</span></label>
-          <label className="block space-y-2"><span className="text-sm font-bold">مفتاح API {draft.id && <span className="font-normal text-muted-foreground">اتركه فارغاً للإبقاء على المفتاح السابق</span>}</span><Input className="h-11 rounded-xl" dir="ltr" type="password" value={draft.apiKey} onChange={event => updateDraft('apiKey', event.target.value)} placeholder="لن يظهر المفتاح بعد الحفظ" autoComplete="off" /></label>
-          <button type="button" onClick={() => updateDraft('enabled', !draft.enabled)} className="flex items-center gap-3 text-sm font-bold"><span className={`flex h-6 w-6 items-center justify-center rounded-full ${draft.enabled ? 'bg-primary text-white' : 'bg-secondary text-muted-foreground'}`}>{draft.enabled && <Check size={14} />}</span>تفعيل هذا المزود</button>
-          <div className="grid grid-cols-2 gap-3"><button type="button" onClick={() => setDraft(emptyDraft())} className="min-h-12 rounded-xl bg-secondary text-sm font-black text-primary">إلغاء</button><button type="button" disabled={saveMutation.isPending || !draft.name || !draft.baseUrl || !draft.model || (!draft.id && !draft.apiKey)} onClick={submitProvider} className="min-h-12 rounded-xl bg-primary text-sm font-black text-primary-foreground disabled:opacity-50">{saveMutation.isPending ? 'جارٍ الحفظ…' : 'حفظ المزود'}</button></div>
-        </div>
-      </section>
+      <nav className="flex gap-2 rounded-2xl border border-primary/10 bg-white p-2 shadow-sm" aria-label="أقسام لوحة المطور" style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        {DEVELOPER_SECTIONS.map(section => { const Icon = section.icon; const active = activeSection === section.id; return <button key={section.id} type="button" onClick={() => setActiveSection(section.id)} aria-pressed={active} style={{ minHeight: '2.75rem' }} className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-black transition active:scale-95 ${active ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-secondary/70 text-primary'}`}><Icon size={16} />{section.label}</button>; })}
+      </nav>
 
-      <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
-        <div className="mb-4 flex items-center gap-2 text-primary"><ServerCog size={19} /><h3 className="font-black">المزودون المحفوظون</h3></div>
-        {providersQuery.isLoading && <p className="text-sm text-muted-foreground">جارٍ تحميل المزودين…</p>}
-        {!providersQuery.isLoading && !providersQuery.data?.length && <p className="rounded-2xl bg-secondary/70 p-4 text-sm leading-6 text-muted-foreground">لم تضف مزوداً بعد. ابدأ بمزود واحد فقط ثم اختبره قبل إضافة مزود آخر.</p>}
-        <div className="space-y-3">
-          {providersQuery.data?.map(provider => <div key={provider.id} className="rounded-2xl border border-stone-100 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-black text-foreground">{provider.name}</p><p className="mt-1 text-xs text-muted-foreground" dir="ltr">{provider.baseUrl}</p><p className="mt-1 text-xs text-muted-foreground">{provider.model} · {provider.enabled ? 'مفعّل' : 'متوقف'} · {provider.hasApiKey ? 'مفتاح محفوظ' : 'لا يوجد مفتاح'}</p></div><div className="flex flex-wrap justify-end gap-1"><button type="button" disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate({ id: provider.id, name: provider.name, baseUrl: provider.baseUrl, model: provider.model, enabled: !provider.enabled })} className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-black disabled:opacity-50 ${provider.enabled ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`} aria-label={`${provider.enabled ? 'إيقاف' : 'تشغيل'} ${provider.name}`}><Power size={14} />{provider.enabled ? 'إيقاف' : 'تشغيل'}</button><button type="button" onClick={() => setDraft(providerToDraft(provider))} className="rounded-lg bg-secondary px-3 py-2 text-xs font-bold text-primary">تعديل</button><button type="button" disabled={checkMutation.isPending || !provider.enabled} onClick={() => checkMutation.mutate({ id: provider.id })} className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 disabled:opacity-50">اختبار</button><button type="button" disabled={removeMutation.isPending} onClick={() => removeMutation.mutate({ id: provider.id })} className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600" aria-label={`حذف ${provider.name}`}><Trash2 size={17} /></button></div></div></div>)}
-        </div>
-      </section>
-      <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense>
-      <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense>
-      <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
+      {activeSection === 'overview' && <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7"><div className="flex items-center gap-2 text-primary"><ServerCog size={20} /><h3 className="font-black">كل صلاحيات المطور هنا</h3></div><p className="mt-2 text-sm leading-6 text-muted-foreground">استخدم الأزرار التالية للوصول المباشر. لا تحتاج إلى البحث في صفحة طويلة.</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={() => setActiveSection('providers')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><ServerCog className="mb-1" size={18} />المزودون والاختبار</button><button type="button" onClick={() => setActiveSection('keys')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><KeyRound className="mb-1" size={18} />المفاتيح الخاصة</button><button type="button" onClick={() => setActiveSection('manage')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Power className="mb-1" size={18} />الرسائل والمستخدمون</button><button type="button" onClick={() => setActiveSection('system')} style={{ minHeight: '4rem' }} className="rounded-2xl bg-primary/5 p-3 text-right text-sm font-black text-primary"><Settings className="mb-1" size={18} />الدخول والسجل</button></div></section>}
+
+      {activeSection === 'providers' && <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المزودين…</section>}><DeveloperProviderTools onDiagnostic={addDiagnostic} /></Suspense>}
+      {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
+      {activeSection === 'system' && <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
         <div className="mb-4 flex items-center justify-between gap-3 text-primary"><div className="flex items-center gap-2"><KeyRound size={19} /><h3 className="font-black">السجل التشخيصي</h3></div><button type="button" onClick={() => setDiagnostics([])} className="text-xs font-bold text-muted-foreground">مسح السجل</button></div>
         {!diagnostics.length && <p className="rounded-2xl bg-secondary/70 p-4 text-sm text-muted-foreground">لا توجد أحداث في الجلسة الحالية.</p>}
         <div className="space-y-2">{diagnostics.map(entry => <div key={entry.id} className="flex items-start gap-3 rounded-2xl bg-secondary/60 p-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${entry.level === 'success' ? 'bg-emerald-500' : entry.level === 'error' ? 'bg-red-500' : 'bg-primary'}`} /><div className="min-w-0 flex-1"><p className="text-sm font-medium text-foreground">{entry.message}</p><p className="mt-1 text-xs text-muted-foreground">{entry.at}</p></div></div>)}</div>
-      </section>
-      <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المساحة الشخصية…</section>}><DeveloperPersonalConsole /></Suspense>
+      </section>}
+      {activeSection === 'manage' && <Suspense fallback={<section className="rounded-[28px] bg-white p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المساحة الشخصية…</section>}><DeveloperPersonalConsole /></Suspense>}
       <button type="button" onClick={onBack} className="w-full py-2 text-sm font-bold text-muted-foreground">العودة إلى الإنشاء</button>
     </section>
   );
