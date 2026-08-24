@@ -6,6 +6,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import { useOptionalTheme } from '@/contexts/ThemeContext';
 import { PRACTICAL_HEADER_RATIO } from '@/lib/brandArtworkSupport';
+import type { LocalToolSetupState } from '@/lib/localRemovalSetup';
 import ArtworkPositionEditor from './ArtworkPositionEditor';
 import ArtworkCropEditor from './ArtworkCropEditor';
 
@@ -18,6 +19,8 @@ interface UserTemplateSettingsProps {
   profile?: MerchantProfile;
   onProfileChange?: (profile: MerchantProfile) => void;
   onRestoreNormal?: () => void;
+  localToolSetup?: LocalToolSetupState;
+  onPrepareLocalTools?: () => void;
 }
 
 type ToggleKey = 'showProductName' | 'showHeadline' | 'showDiscount' | 'showQuantity' | 'showColors' | 'showFeatures' | 'showPrice' | 'showStoreInfo' | 'showQualityMark';
@@ -93,7 +96,7 @@ function ToggleRow({ item, active, onToggle }: { item: { key: ToggleKey; title: 
   </button>;
 }
 
-export default function UserTemplateSettings({ settings, onChange, onBack, onAbout, onDeveloper, profile, onProfileChange, onRestoreNormal }: UserTemplateSettingsProps) {
+export default function UserTemplateSettings({ settings, onChange, onBack, onAbout, onDeveloper, profile, onProfileChange, onRestoreNormal, localToolSetup, onPrepareLocalTools }: UserTemplateSettingsProps) {
   const { theme, setTheme } = useOptionalTheme();
   const [artworkError, setArtworkError] = useState('');
   const [isSaved, setIsSaved] = useState(false);
@@ -182,6 +185,7 @@ export default function UserTemplateSettings({ settings, onChange, onBack, onAbo
     </SettingsCard>
 
     <SettingsCard id="help" icon={CircleHelp} title="المساعدة والتطبيق" summary="دليل الاستخدام، معلومات المشروع، ولوحة المطور المحمية" open={openCard === 'help'} onToggle={() => setCard('help')}>
+      {localToolSetup && <div className="rounded-2xl border border-primary/15 bg-white p-3"><div className="flex items-center gap-3"><span className={`flex h-9 w-9 items-center justify-center rounded-xl ${localToolSetup.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-primary/10 text-primary'}`}>{localToolSetup.status === 'ready' ? <CheckCircle2 size={18} /> : <Wrench size={18} />}</span><div className="min-w-0 flex-1"><p className="text-sm font-black text-primary">أدوات إزالة الخلفية</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{localToolSetup.status === 'ready' ? 'جاهزة داخل التطبيق للعمل المحلي.' : localToolSetup.label}</p></div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary" style={{ width: `${localToolSetup.progress}%` }} /></div><div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] font-bold text-muted-foreground">نموذج محلي بحجم تقريبي 4.4MB</span><button type="button" disabled={!onPrepareLocalTools || localToolSetup.status === 'preparing'} onClick={onPrepareLocalTools} className="rounded-xl border border-primary/20 bg-white px-3 py-2 text-xs font-black text-primary disabled:opacity-50">{localToolSetup.status === 'preparing' ? 'جارٍ التجهيز…' : 'إعادة التحميل'}</button></div></div>}
       <button type="button" onClick={() => setTheme?.(theme === 'dark' ? 'light' : 'dark')} className="flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">{theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}</span>{theme === 'dark' ? 'العودة للوضع الفاتح' : 'تفعيل الوضع الليلي'}<span style={{ marginRight: 'auto' }} className="text-[11px] text-muted-foreground">محفوظ على هذا الهاتف</span></button>
       {onRestoreNormal && <button type="button" onClick={onRestoreNormal} className="mt-3 flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><RotateCcw size={18} />استعادة الوضع الطبيعي<span style={{ marginRight: 'auto' }} className="text-[11px] font-medium text-muted-foreground">لا يحذف الصور أو الحساب أو المفاتيح</span></button>}
       <button type="button" onClick={onAbout} className="flex min-h-12 w-full items-center gap-2 rounded-2xl border border-primary/15 bg-white px-4 py-3 text-right text-sm font-black text-primary transition active:scale-[0.99]"><Sparkles size={18} />حول التطبيق وبيانات المطور</button>

@@ -128,9 +128,24 @@ export async function removeBackgroundLocally(sourceUrl: string, onStage?: (stag
  * يبدأ تنزيل النموذج وتجهيز جلسة WebAssembly بعد اختيار صورة الملابس، بينما
  * يراجع المستخدم بيانات الإعلان. يعاد استعمال الوعد نفسه عند الضغط على التوليد.
  */
-export async function prewarmLocalBackgroundRemoval(): Promise<void> {
+export async function prewarmLocalBackgroundRemoval(onStage?: (stage: LocalRemovalStage) => void): Promise<void> {
   if (typeof WebAssembly === 'undefined') return;
-  await getSession();
+  await getSession(onStage);
+}
+
+/** يمسح النسخ المخزنة من النموذج كي يستطيع المستخدم إعادة تجهيزه من الإعدادات. */
+export async function clearLocalBackgroundRemovalCache(): Promise<void> {
+  sessionPromise = null;
+  try {
+    if ('caches' in window) await caches.delete(MODEL_CACHE_NAME);
+  } catch {
+    // يبقى المسار آمناً حتى لو لم يدعم الجهاز Cache Storage.
+  }
+  try {
+    if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase(MODEL_IDB_NAME);
+  } catch {
+    // لا تمنع إعادة التحميل عند تعذر حذف النسخة الدائمة.
+  }
 }
 
 async function getSession(onStage?: (stage: LocalRemovalStage) => void) {

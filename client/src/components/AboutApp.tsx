@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Github, MessageCircle, ShieldCheck } from 'lucide-react';
 
-const LOGO_URL = '/manus-storage/marwan-designer-logo_df9b28d4.png';
+const LOGO_URL = import.meta.env.VITE_EMBEDDED_ANDROID_APP === 'true' ? '/app-logo.png' : '/manus-storage/marwan-designer-logo_df9b28d4.png';
 
 export default function AboutApp({ onBack }: { onBack: () => void }) {
   return (

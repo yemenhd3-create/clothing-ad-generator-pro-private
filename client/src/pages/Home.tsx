@@ -33,8 +33,9 @@ import { buildDesignBenchmarks, createQualityFingerprint, detectDesignRegression
 import { createSuggestionFromMetrics } from '@/lib/localDesignIntelligence';
 import { prepareLocalAnalysis } from '@/lib/localAnalysisCache';
 import { clearPreferenceProfile, loadPreferenceProfile, recordLayoutPreference, setPreferenceEnabled } from '@/lib/localArtDirectorPreferences';
-import { prewarmLocalBackgroundRemoval, removeBackgroundLocally, type LocalRemovalStage } from '@/lib/localBackgroundRemoval';
+import { clearLocalBackgroundRemovalCache, prewarmLocalBackgroundRemoval, removeBackgroundLocally, type LocalRemovalStage } from '@/lib/localBackgroundRemoval';
 import { formatLocalFirstDownloadSize, formatLocalModelSize, getLocalRemovalUnavailableMessage } from '@/lib/localBackgroundRemovalSupport';
+import { createLocalToolSetupState, LOCAL_TOOL_READY_KEY, localToolSetupStateForStage, type LocalToolSetupState } from '@/lib/localRemovalSetup';
 import { downloadImage, shareToWhatsApp, shareViaWebAPI } from '@/lib/share';
 import { getWardrobeShareText } from '@/lib/wardrobeShare';
 import { getWardrobeOverlayHelp } from '@/lib/wardrobeOverlayHelp';
@@ -73,7 +74,8 @@ import {
   LayoutTemplate,
 } from 'lucide-react';
 
-const LOGO_URL = '/manus-storage/marwan-designer-logo_df9b28d4.png';
+const EMBEDDED_ANDROID_APP = import.meta.env.VITE_EMBEDDED_ANDROID_APP === 'true';
+const LOGO_URL = EMBEDDED_ANDROID_APP ? '/app-logo.png' : '/manus-storage/marwan-designer-logo_df9b28d4.png';
 const AboutApp = React.lazy(() => import('@/components/AboutApp'));
 const BatchWorkspace = React.lazy(() => import('@/components/BatchWorkspace'));
 const DeveloperWorkspace = React.lazy(() => import('@/components/DeveloperWorkspace'));
@@ -173,6 +175,14 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const [comparisonPreviews, setComparisonPreviews] = useState<{ current: string; suggested: string } | null>(null);
   const [isDesignAnalyzing, setIsDesignAnalyzing] = useState(false);
   const [localPreparation, setLocalPreparation] = useState<{ status: 'idle' | 'analyzing' | 'ready' | 'failed'; cache?: 'hit' | 'miss'; elapsedMs?: number }>({ status: 'idle' });
+  const [localToolSetup, setLocalToolSetup] = useState<LocalToolSetupState>(() => {
+    if (!EMBEDDED_ANDROID_APP) return createLocalToolSetupState('ready');
+    try {
+      return localStorage.getItem(LOCAL_TOOL_READY_KEY) === 'ready' ? createLocalToolSetupState('ready') : createLocalToolSetupState('checking');
+    } catch {
+      return createLocalToolSetupState('checking');
+    }
+  });
   const [designBenchmarks, setDesignBenchmarks] = useState<DesignBenchmark[]>([]);
   const [designRegression, setDesignRegression] = useState<DesignRegression | null>(null);
   const [designPassport, setDesignPassport] = useState<DesignPassport | null>(null);
@@ -196,6 +206,26 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const tryOnMutation = trpc.tryOn.run.useMutation();
   const connectedLeaderMutation = trpc.leader.connected.useMutation();
   const announcementQuery = trpc.personal.announcement.useQuery(undefined, { enabled: !friendTestMode });
+
+  const prepareLocalTools = React.useCallback(async (force = false) => {
+    setLocalToolSetup(createLocalToolSetupState('preparing'));
+    try {
+      if (force) {
+        await clearLocalBackgroundRemovalCache();
+        try { localStorage.removeItem(LOCAL_TOOL_READY_KEY); } catch { /* storage is optional */ }
+      }
+      await prewarmLocalBackgroundRemoval(stage => setLocalToolSetup(localToolSetupStateForStage(stage)));
+      setLocalToolSetup(createLocalToolSetupState('success'));
+      try { localStorage.setItem(LOCAL_TOOL_READY_KEY, 'ready'); } catch { /* storage is optional */ }
+      window.setTimeout(() => setLocalToolSetup(createLocalToolSetupState('ready')), 900);
+    } catch {
+      setLocalToolSetup(createLocalToolSetupState('failed'));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (EMBEDDED_ANDROID_APP && localToolSetup.status === 'checking') void prepareLocalTools();
+  }, [localToolSetup.status, prepareLocalTools]);
 
   useEffect(() => {
     const savedDetails = getFromStorage<AdDetails>(StorageKeys.LAST_AD_DETAILS);
@@ -1141,6 +1171,10 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     }
   };
 
+  if (EMBEDDED_ANDROID_APP && localToolSetup.status !== 'ready') {
+    return <LocalToolsSetupScreen state={localToolSetup} onRetry={() => void prepareLocalTools(true)} />;
+  }
+
   const currentIndex = WORKFLOW_STEPS.findIndex(step => step.id === currentStep);
   const isWardrobeStudio = WARDROBE_ROOM_MODE && activeView === 'create' && currentStep === 'final';
   const mobileShellStyle = WARDROBE_ROOM_MODE ? { minHeight: '100svh', height: '100svh', overflow: 'hidden', background: 'var(--card)' } : undefined;
@@ -1200,6 +1234,8 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
             profile={merchantProfile}
             onProfileChange={handleMerchantProfileDraftChange}
             onRestoreNormal={restoreNormalMode}
+            localToolSetup={EMBEDDED_ANDROID_APP ? localToolSetup : undefined}
+            onPrepareLocalTools={() => void prepareLocalTools(true)}
           /></React.Suspense>)}
 
         {activeView === 'assistant' && <React.Suspense fallback={<PageLoading label="جارٍ فتح القائد المحلي…" />}><MerchantAssistantWorkspace profile={merchantProfile} session={merchantAssistantSession} template={templateSettings} onCommitProfile={handleMerchantProfileCommit} onCommitSession={handleMerchantAssistantSessionCommit} onApplyCommands={handleMerchantCommands} onApplyArtwork={handleMerchantArtwork} onRequestOnlineReply={friendTestMode ? undefined : (message) => connectedLeaderMutation.mutateAsync({ message })} onRestoreBackup={handleLocalProjectBackupRestore} onClearProfile={handleMerchantProfileClear} onClearSession={handleMerchantAssistantSessionClear} onOpenUpdatedResult={() => { setActiveView('create'); setCurrentStep('final'); }} /></React.Suspense>}
@@ -1313,7 +1349,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               </div>}
 
               {isGenerating && (
-                <div className="flex flex-col items-center justify-center rounded-3xl bg-secondary/70 p-8 text-center" style={{ minHeight: 320 }}>
+                <div className="flex flex-1 flex-col items-center justify-center rounded-3xl bg-secondary/70 p-8 text-center" style={{ minHeight: 320 }}>
                   <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-white text-primary shadow-sm">
                     <Sparkles className="animate-pulse" size={28} />
                   </div>
@@ -1345,7 +1381,15 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 </>
               )}
 
-              {!isGenerating && tryOnResult.status === 'unavailable' && (
+              {!isGenerating && tryOnResult.status === 'unavailable' && WARDROBE_ROOM_MODE && (
+                <div className="flex flex-1 items-center justify-center" style={{ minHeight: 0 }}>
+                  <div className="w-full rounded-2xl border border-red-200 bg-red-50 p-5 text-center" role="alert">
+                    <p className="font-bold text-red-900">{tryOnResult.message}</p>
+                    <div className="mt-3 flex justify-center gap-2"><button type="button" onClick={() => void generateAd()} className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white">إعادة المحاولة</button><button type="button" onClick={returnToImagePicker} className="rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-900">صورة أخرى</button></div>
+                  </div>
+                </div>
+              )}
+              {!isGenerating && tryOnResult.status === 'unavailable' && !WARDROBE_ROOM_MODE && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-center" role="alert">
                   <p className="font-bold text-red-900">{tryOnResult.message}</p>
                   <button type="button" onClick={() => void generateAd()} className="mt-3 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-white">إعادة المحاولة</button>
@@ -1386,6 +1430,12 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
 function PageLoading({ label }: { label: string }) {
   return <div className="rounded-[28px] border border-primary/10 bg-white p-8 text-center shadow-[0_16px_40px_rgba(37,35,95,0.08)]"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><LoaderCircle className="animate-spin" size={22} /></div><p className="text-sm font-black text-primary">{label}</p><p className="mt-1 text-xs text-muted-foreground">لا تغلق الصفحة، ستظهر أدواتك خلال لحظات.</p></div>;
+}
+
+function LocalToolsSetupScreen({ state, onRetry }: { state: LocalToolSetupState; onRetry: () => void }) {
+  const isFailed = state.status === 'failed';
+  const isDone = state.status === 'success';
+  return <main className="flex min-h-screen items-center justify-center bg-[#fffdf6] p-5 text-center" dir="rtl"><section className="w-full max-w-sm rounded-[30px] border border-primary/10 bg-white p-7 shadow-[0_16px_40px_rgba(37,35,95,0.08)]"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary/10 text-primary">{isDone ? <Check size={30} /> : <LoaderCircle className={isFailed ? '' : 'animate-spin'} size={30} />}</div><h1 className="mt-5 text-xl font-black text-primary">{isDone ? 'تم تجهيز الأدوات' : isFailed ? 'تعذر تجهيز الأدوات' : 'نجهّز التطبيق لأول استخدام'}</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">{state.label}</p><div className="mt-6 h-3 overflow-hidden rounded-full bg-secondary" aria-label={`التجهيز ${state.progress}%`}><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${state.progress}%` }} /></div><p className="mt-2 text-sm font-black text-primary">{state.progress}%</p>{isFailed && <button type="button" onClick={onRetry} className="reference-primary mt-6 w-full"><RotateCcw size={18} />إعادة التحميل</button>}<p className="mt-5 text-[11px] leading-5 text-muted-foreground">تُحفظ الأدوات على هذا الهاتف، لذلك لا تحتاج إعادة تنزيلها عند كل استخدام.</p></section></main>;
 }
 
 function ProductScaleControl({ scale, disabled, onCommit }: { scale: number; disabled: boolean; onCommit: (value: number) => void }) {
