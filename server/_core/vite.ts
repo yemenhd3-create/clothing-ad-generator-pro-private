@@ -58,6 +58,16 @@ export function serveStatic(app: Express) {
     );
   }
 
+  // Android verifies Trusted Web Activities through this exact public location.
+  // Serving it before the SPA fallback prevents `assetlinks.json` from becoming HTML.
+  app.use(
+    "/.well-known",
+    express.static(path.resolve(distPath, ".well-known"), {
+      fallthrough: false,
+      index: false,
+    })
+  );
+
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
