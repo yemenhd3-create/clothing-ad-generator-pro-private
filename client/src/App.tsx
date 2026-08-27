@@ -45,7 +45,10 @@ function PersonalHome() {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز مساحة الدفعة…" />}><BatchVisualCheck /></Suspense>;
   }
   const friendTestMode = isFriendTestMode(import.meta.env.VITE_FRIEND_TEST_MODE);
-  if (friendTestMode) {
+  const developerEntryRequested = new URLSearchParams(window.location.search).has('developer');
+  // المسار العام متاح للأصدقاء بلا حساب. تبقى الأدوات الخاصة والمزودات
+  // والرسائل خارج هذا المسار، ولا يفتحها إلا رابط المطور المحمي.
+  if (friendTestMode || !developerEntryRequested) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الاختبار…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
   }
   return <ProjectAccessGate />;

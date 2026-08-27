@@ -1,3 +1,5 @@
+import { shareImageThroughNativeAndroid } from './nativeAndroidShare';
+
 /**
  * Share and Download Utilities
  * Handles sharing to WhatsApp, email, and downloading images
@@ -98,6 +100,9 @@ export async function shareViaWebAPI(
   text: string = 'تحقق من هذا الإعلان الرائع!'
 ): Promise<boolean> {
   try {
+    if (await shareImageThroughNativeAndroid(imageUrl, title, text)) {
+      return true;
+    }
     if (!navigator.share) {
       console.warn('Web Share API not available');
       return false;
