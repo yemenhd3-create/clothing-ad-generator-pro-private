@@ -1,0 +1,6 @@
+{
+  "appId": "com.marwan.ghorfatalmalabes",
+  "appName": "غرفة الملابس",
+  "webDir": "dist/public",
+  "bundledWebRuntime": false
+}

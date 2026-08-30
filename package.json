@@ -12,6 +12,7 @@
     "test": "vitest run",
     "perf:check": "node scripts/performance-check.mjs",
     "mobile:check": "node scripts/mobile-layout-check.mjs",
+    "android:build": "node scripts/build-android.mjs",
     "ai:packet": "node scripts/generate-ai-reading-packet.mjs",
     "quality": "pnpm test && pnpm check && pnpm build && pnpm perf:check",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
@@ -19,6 +20,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
     "@aws-sdk/s3-request-presigner": "^3.1111.0",
+    "@capacitor/android": "7.6.8",
+    "@capacitor/core": "7.6.8",
+    "@capacitor/filesystem": "7.1.8",
+    "@capacitor/share": "7.0.4",
     "@hookform/resolvers": "^5.2.2",
     "@mediapipe/tasks-vision": "1.0.1",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -86,6 +91,7 @@
   },
   "devDependencies": {
     "@builder.io/vite-plugin-jsx-loc": "^0.1.1",
+    "@capacitor/cli": "7.6.8",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
     "@testing-library/react": "^16.3.2",
