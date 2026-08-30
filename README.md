@@ -111,6 +111,7 @@ pnpm android:build
 - [`docs/HANDOVER_INDEPENDENCE_AUDIT_AR.md`](docs/HANDOVER_INDEPENDENCE_AUDIT_AR.md) — استقلالية المطور والملكية.
 - [`docs/HANDOVER_TEST_REPORT_AR.md`](docs/HANDOVER_TEST_REPORT_AR.md) — الاختبارات الفعلية ومصفوفة الجهاز.
 - [`docs/HANDOVER_MAINTENANCE_AR.md`](docs/HANDOVER_MAINTENANCE_AR.md) — الصيانة وإصدار التحديثات.
+- [`docs/ENV_TEMPLATE.example`](docs/ENV_TEMPLATE.example) — أسماء متغيرات البيئة كقالب آمن بلا قيم.
 
 ## الحالة الواقعية
 
