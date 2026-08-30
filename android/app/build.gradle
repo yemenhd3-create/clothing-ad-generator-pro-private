@@ -1,7 +1,8 @@
 apply plugin: 'com.android.application'
 
-def releaseKeystorePath = System.getenv('APK_KEYSTORE_PATH') ?: '/home/ubuntu/.private-apk-keys/marwan-ghorfatalmalabes-release.jks'
+def releaseKeystorePath = System.getenv('APK_KEYSTORE_PATH')
 def releaseKeystorePassword = System.getenv('APK_KEYSTORE_PASSWORD')
+def releaseSigningEnabled = releaseKeystorePath && releaseKeystorePassword
 
 android {
     namespace "com.marwan.ghorfatalmalabes"
@@ -21,7 +22,7 @@ android {
     }
     signingConfigs {
         release {
-            if (releaseKeystorePassword) {
+            if (releaseSigningEnabled) {
                 storeFile file(releaseKeystorePath)
                 storePassword releaseKeystorePassword
                 keyAlias 'marwan-ghorfatalmalabes-release'
@@ -32,7 +33,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            if (releaseKeystorePassword) {
+            if (releaseSigningEnabled) {
                 signingConfig signingConfigs.release
             }
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
