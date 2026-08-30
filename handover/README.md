@@ -10,9 +10,9 @@
 | Package ID | `com.marwan.ghorfatalmalabes` |
 | المستودع الخاص | https://github.com/yemenhd3-create/clothing-ad-generator-pro-private |
 | الفرع | `main` |
-| Final handover commit | `725e90bf7d9c5615fe7a912d07c9ed4f9e2ec505` |
+| Final handover commit | `03853e47c5962b1e1325cd727d4db63d1bdee7aa` |
 | مصدر الحقيقة | Git Repository فقط |
-| APK النهائي المرفق | `ghorfat-almalabes-release-clean-clone.apk` |
+| APK النهائي المرفق | `ghorfat-almalabes-release-unsigned.apk` |
 
 أُدخل مشروع `android/` و`capacitor.config.json` وسكربت `scripts/build-android.mjs` إلى المستودع. لم يعد APK يعتمد على مشروع Android خارجي لإنشائه.
 
@@ -54,7 +54,7 @@ React 19 وTailwind 4 يعملان كواجهة؛ Vite يبني `dist/public`. E
 
 ## 6. إثبات Clean Clone
 
-تم تنفيذ `gh repo clone` من GitHub الخاص، ثم `pnpm install --frozen-lockfile` و`pnpm android:build` من دون `node_modules` سابق. الناتج كان `BUILD SUCCESSFUL` من Commit `725e90bf7d9c5615fe7a912d07c9ed4f9e2ec505`. هذا يثبت أن المستودع يحتوي المصدر اللازم للبناء، ولا يثبت وحده نقل ملكية التوقيع أو اختبار هاتف فعلي.
+تم تنفيذ `gh repo clone` من GitHub الخاص، ثم `pnpm install --frozen-lockfile` و`pnpm android:build` من دون `node_modules` سابق. الناتج كان `BUILD SUCCESSFUL` من Commit `03853e47c5962b1e1325cd727d4db63d1bdee7aa`. هذا يثبت أن المستودع يحتوي المصدر اللازم للبناء، ولا يثبت وحده نقل ملكية التوقيع أو اختبار هاتف فعلي.
 
 ## 7. تقرير APK
 
@@ -65,11 +65,11 @@ React 19 وTailwind 4 يعملان كواجهة؛ Vite يبني `dist/public`. E
 | Version Code | `2` |
 | Min SDK | `23` |
 | Target SDK | `35` |
-| الحجم | `3,759,146 bytes` |
-| SHA-256 | `137072ebb57c75d4ebf2563b982e577f515bc1b33df0bab923585c3a759bf66b` |
+| الحجم | `3,707,793 bytes` |
+| SHA-256 | `f6c43572d428c40c8b0c1ce35641dcd1a7c15e81faccffc2a0cdf96ed5ebaa23` |
 | Activity | `com.marwan.ghorfatalmalabes.MainActivity` |
 | Permissions | INTERNET وDYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION |
-| Signing | v1 وv2 صحيحان؛ v3/v4 غير مستخدمين في الناتج المفحوص |
+| Signing | APK Clean Clone غير موقّع؛ يلزم keystore المالك قبل التوزيع |
 | Services/Receivers | لا يوجد مكوّن خدمة أو Receiver مخصص ظاهر في Manifest |
 
 أثبت فحص الأرشيف وجود `assets/public/index.html` وملفات الواجهة و`u2netp.onnx` وWebAssembly داخل APK، كما لا يحتوي إعداد Capacitor على `server.url`.

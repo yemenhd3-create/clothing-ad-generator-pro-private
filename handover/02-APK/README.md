@@ -1,1 +1,1 @@
-APK is generated into ignored artifacts/; final SHA-256 is recorded in the reports.
+APK artifact is delivered separately from the source ZIP. Use the SHA-256 in the final report.

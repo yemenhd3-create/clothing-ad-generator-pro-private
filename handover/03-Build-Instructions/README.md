@@ -51,7 +51,7 @@ pnpm mobile:check
 pnpm android:build
 ```
 
-ينفذ السكربت `pnpm build`، ثم `pnpm exec cap sync android`، ثم `./android/gradlew assembleRelease`. ينشئ Gradle ملف `android/local.properties` محلياً من `ANDROID_HOME` أو `ANDROID_SDK_ROOT`، ولا يُحفظ في Git. عند غياب مفتاح توقيع المالك، يُستخدم إعداد البناء غير الموقّع/المحلي بحسب إعداد Gradle؛ لا يجوز توزيع الناتج على أنه Release مملوك قبل توقيعه بمفتاح المالك.
+ينفذ السكربت `pnpm build`، ثم `pnpm exec cap sync android`، ثم `./android/gradlew assembleRelease`. ينشئ Gradle ملف `android/local.properties` محلياً من `ANDROID_HOME` أو `ANDROID_SDK_ROOT`، ولا يُحفظ في Git. عند غياب مفتاح توقيع المالك، ينتج السكربت صراحةً `artifacts/ghorfat-almalabes-release-unsigned.apk`. لا يجوز توزيع هذا الملف على أنه Release مملوك؛ الإصدار القابل للتوزيع يجب أن ينتج `artifacts/ghorfat-almalabes-release.apk` بعد تزويد بيئة البناء بـ keystore المملوك للمالك.
 
 لتوقيع إصدار Release يجب أن يزوّد مالك المشروع بيئة البناء بمسار keystore وكلمة مروره خارج Git:
 

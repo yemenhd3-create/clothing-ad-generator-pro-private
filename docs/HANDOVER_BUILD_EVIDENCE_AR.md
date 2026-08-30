@@ -4,7 +4,7 @@
 
 تم تنفيذ استنساخ نظيف من المستودع الخاص باستخدام `gh repo clone` إلى بيئة مؤقتة لا تحتوي على `node_modules` مسبقاً. كان Commit المصدر:
 
-`725e90bf7d9c5615fe7a912d07c9ed4f9e2ec505`
+`03853e47c5962b1e1325cd727d4db63d1bdee7aa`
 
 ثم نُفذت الأوامر التالية بالترتيب:
 
@@ -15,7 +15,7 @@ pnpm install --frozen-lockfile
 pnpm android:build
 ```
 
-نجح `pnpm android:build` بعد تنفيذ `pnpm build` و`pnpm exec cap sync android` و`./gradlew assembleRelease`. مسار الناتج هو `artifacts/ghorfat-almalabes-release.apk`.
+نجح `pnpm android:build` بعد تنفيذ `pnpm build` و`pnpm exec cap sync android` و`./gradlew assembleRelease`. مسار الناتج هو `artifacts/ghorfat-almalabes-release-unsigned.apk`.
 
 ## البيئة
 
@@ -35,13 +35,13 @@ pnpm android:build
 
 | الخاصية | القيمة |
 |---|---|
-| الاسم | `ghorfat-almalabes-release.apk` |
-| الحجم | 3,759,146 bytes |
-| SHA-256 | `137072ebb57c75d4ebf2563b982e577f515bc1b33df0bab923585c3a759bf66b` |
+| الاسم | `ghorfat-almalabes-release-unsigned.apk` |
+| الحجم | 3,707,793 bytes |
+| SHA-256 | `f6c43572d428c40c8b0c1ce35641dcd1a7c15e81faccffc2a0cdf96ed5ebaa23` |
 | Package ID | `com.marwan.ghorfatalmalabes` |
 | Version Name | `1.0.0` |
 | Version Code | `2` |
-| Signing schemes | v1 وv2 صحيحان في فحص APK |
+| Signing schemes | APK غير موقّع في Clean Clone الآلي؛ يتطلب keystore المالك للتوزيع |
 
 هذه البصمة تخص ناتج Clean Clone بعد البناء الحالي. اختلاف البصمة عن APK سابق متوقع لأن Gradle وVite قد ينتجان أرشيفاً مختلفاً زمنياً؛ إثبات المصدر هو Commit المستنسخ وسجل البناء، لا مساواة البصمة بملف قديم.
 
