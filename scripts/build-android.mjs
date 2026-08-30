@@ -21,11 +21,15 @@ if (!existsSync(androidHome)) {
 writeFileSync(resolve(root, "android/local.properties"), `sdk.dir=${androidHome.replaceAll("\\\\", "/")}\n`);
 run("./gradlew", ["assembleRelease"], { cwd: resolve(root, "android") });
 
-const apk = resolve(root, "android/app/build/outputs/apk/release/app-release.apk");
-if (!existsSync(apk)) throw new Error(`Release APK was not produced: ${apk}`);
+const releaseDir = resolve(root, "android/app/build/outputs/apk/release");
+const signedApk = resolve(releaseDir, "app-release.apk");
+const unsignedApk = resolve(releaseDir, "app-release-unsigned.apk");
+const apk = existsSync(signedApk) ? signedApk : unsignedApk;
+if (!existsSync(apk)) throw new Error(`Release APK was not produced in ${releaseDir}`);
 
 const artifacts = resolve(root, "artifacts");
 mkdirSync(artifacts, { recursive: true });
-const destination = resolve(artifacts, "ghorfat-almalabes-release.apk");
+const destinationName = apk === signedApk ? "ghorfat-almalabes-release.apk" : "ghorfat-almalabes-release-unsigned.apk";
+const destination = resolve(artifacts, destinationName);
 copyFileSync(apk, destination);
 console.log(`APK: ${destination}`);
