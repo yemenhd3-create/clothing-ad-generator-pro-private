@@ -48,4 +48,14 @@ describe('personal workspace data access', () => {
     getDb.mockRejectedValueOnce(new Error('database unavailable'));
     await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true, registrationOpen: true, offlineGraceHours: 72 });
   });
+
+  it('يسجل آخر اتصال للمستخدم عند تنفيذ heartbeat', async () => {
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn(() => ({ where }));
+    getDb.mockResolvedValue({ update: vi.fn(() => ({ set })) });
+
+    await expect((await import('./personalWorkspace')).touchUserPresence(12)).resolves.toMatchObject({ success: true });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ lastSeenAt: expect.any(Date) }));
+    expect(where).toHaveBeenCalled();
+  });
 });

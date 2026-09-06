@@ -128,3 +128,7 @@ pnpm android:build
 بعد نجاح التحقق، تسجل الواجهة حضور المستخدم عند الاتصال. يحفظ التطبيق عقدة محلية مؤقتة لمدة `offlineGraceHours` (الافتراضي 72 ساعة) حتى يعمل المسار المحلي دون اتصال. عند انتهاء المدة تظهر رسالة تطلب فتح الإنترنت للتحقق من الحساب. الإيقاف عن بُعد يصل للمستخدم المتصل، وعند أول مزامنة للمستخدم غير المتصل. لا توجد طريقة تقنية لإرسال قرار إلى جهاز لا يتصل بالخادم.
 
 زر «التسجيل الجديد» يوقف إنشاء الحسابات والأكواد الجديدة، ولا يطرد الحسابات المعتمدة. إعداد «مدة العمل دون اتصال» قابل للتعديل من لوحة المطور بين 0 و720 ساعة. لوحة المطور محمية ولا تُمنح للمستخدم العادي، ويمكن فتح مدخلها من الويب أو من داخل التطبيق عند توفر اتصال.
+
+## Render deployment source of truth
+
+`render.yaml` defines a reproducible Node web service for this private repository. It builds with `pnpm install --frozen-lockfile && pnpm build` and starts with `pnpm start`. Secret values are marked `sync: false` and must be entered only in the owner's Render Environment settings. The APK does not use this service as its UI source; Capacitor packages `dist/public` locally. To make the existing Render URL follow this private repository, the owner must select this repository and the `main` branch in the Render service settings, then confirm a successful deploy from the final commit.
