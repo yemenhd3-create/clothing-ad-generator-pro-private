@@ -31,8 +31,8 @@ describe('personal workspace data access', () => {
       insert: vi.fn(() => ({ values })),
     });
 
-    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true });
-    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 1 });
+    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true, registrationOpen: true, offlineGraceHours: 72 });
+    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 1, registrationOpen: 1, offlineGraceHours: 72 });
   });
 
   it('يحفظ إيقاف تأمين الدخول ليُفتح المشروع مباشرة للاختبار', async () => {
@@ -41,11 +41,11 @@ describe('personal workspace data access', () => {
     getDb.mockResolvedValue({ insert: vi.fn(() => ({ values })) });
 
     await expect(setProjectLoginRequired(false)).resolves.toEqual({ loginRequired: false });
-    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 0 });
+    expect(values).toHaveBeenCalledWith({ id: 1, loginRequired: 0, registrationOpen: 0 });
   });
 
   it('يعيد وضع التأمين عند تعذر قراءة إعداد الدخول بدلاً من إبقاء الواجهة معلقة', async () => {
     getDb.mockRejectedValueOnce(new Error('database unavailable'));
-    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true });
+    await expect(getProjectAccessSettings()).resolves.toEqual({ loginRequired: true, registrationOpen: true, offlineGraceHours: 72 });
   });
 });

@@ -1,41 +1,83 @@
-import { startLogin } from '@/const';
 import { useAuth } from '@/_core/hooks/useAuth';
 import { trpc } from '@/lib/trpc';
+import { clearOfflineLease, hasValidOfflineLease, saveOfflineLease } from '@/lib/offlineAccess';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
-import { KeyRound, LockKeyhole, LogIn, ShieldAlert } from 'lucide-react';
-import React, { useState, type ReactNode } from 'react';
+import { startLogin } from '@/const';
+import { KeyRound, LockKeyhole, LogIn, ShieldAlert, Wifi } from 'lucide-react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 export default function PersonalAccessGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const accessQuery = trpc.personal.access.useQuery(undefined, {
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && isOnline,
     retry: 1,
     retryDelay: 700,
     refetchOnWindowFocus: false,
   });
+  const modeQuery = trpc.projectAccess.mode.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+    enabled: isOnline,
+  });
+  const heartbeat = trpc.personal.heartbeat.useMutation({
+    onSuccess: () => {
+      saveOfflineLease(modeQuery.data?.offlineGraceHours ?? 72);
+    },
+    onError: error => {
+      if (/FORBIDDEN|موقوف|disabled/i.test(error.message)) clearOfflineLease();
+    },
+  });
 
-  if (loading || (isAuthenticated && accessQuery.isLoading)) {
+  useEffect(() => {
+    const updateOnlineState = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateOnlineState);
+    window.addEventListener('offline', updateOnlineState);
+    return () => {
+      window.removeEventListener('online', updateOnlineState);
+      window.removeEventListener('offline', updateOnlineState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && isOnline) heartbeat.mutate();
+    // The mutation object is intentionally omitted: auth/online transitions are the triggers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isOnline]);
+
+  const offlineLeaseValid = !isOnline && hasValidOfflineLease();
+  const modeLoading = isOnline && modeQuery.isLoading;
+
+  if (loading || modeLoading || (isAuthenticated && isOnline && accessQuery.isLoading)) {
     return <AccessShell icon={<LockKeyhole className="animate-pulse" size={28} />} title="جارٍ فتح مساحتك الشخصية" description="نتحقق من حسابك وإعدادات الوصول بأمان." />;
   }
 
+  if (!isOnline && !offlineLeaseValid) {
+    return <AccessShell icon={<Wifi size={28} />} title="انتهت مدة العمل دون اتصال" description="افتح الإنترنت للتحقق من صلاحية الحساب وتجديد مدة العمل المحلي. لن تُحذف الصور أو الإعدادات المحفوظة على هذا الجهاز." action={<button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground"><Wifi size={19} />إعادة التحقق</button>} />;
+  }
+
+  if (!isAuthenticated && offlineLeaseValid) {
+    return <>{children}</>;
+  }
+
   if (!isAuthenticated) {
-    return (
-      <AccessShell
-        icon={<LockKeyhole size={28} />}
-        title="دخول إلى المساحة الشخصية"
-        description="أدخل رمز الوصول الذي أنشأه المطور، أو استخدم حسابك المعتاد إذا كان لديك."
-        action={<><AccessCodeEntry onPlatformLogin={() => startLogin()} /><PwaInstallPrompt /></>}
-      />
-    );
+    if (!isOnline) {
+      return <AccessShell icon={<Wifi size={28} />} title="افتح الإنترنت للتحقق من الدخول" description="يحتاج هذا الجهاز إلى اتصال قصير للتحقق من مفتاحك أو حسابك قبل بدء العمل المحلي." action={<button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground"><Wifi size={19} />إعادة المحاولة</button>} />;
+    }
+    if (modeQuery.data?.registrationOpen === false) {
+      return <AccessShell icon={<ShieldAlert size={30} />} title="التسجيل الجديد متوقف" description="أوقف المطور إنشاء حسابات أو أكواد جديدة مؤقتاً. الحسابات المعتمدة تستمر في الدخول عند توفر اتصال." action={<PwaInstallPrompt />} />;
+    }
+    return <AccessShell icon={<LockKeyhole size={28} />} title="دخول إلى المساحة الشخصية" description="أدخل رمز الوصول الذي أنشأه المطور، أو استخدم حسابك المعتاد إذا كان لديك." action={<><AccessCodeEntry onPlatformLogin={() => startLogin()} /><PwaInstallPrompt /></>} />;
   }
 
   if (accessQuery.data?.isDisabled) {
-    return <AccessShell icon={<ShieldAlert size={30} />} title="الوصول موقوف حالياً" description="هذا الحساب لا يستطيع استخدام مساحة المشروع الآن. راجع المطور من جهازه أو حسابه المصرح به لإعادة التفعيل." />;
+    clearOfflineLease();
+    return <AccessShell icon={<ShieldAlert size={30} />} title="الوصول موقوف حالياً" description="هذا الحساب لا يستطيع استخدام مساحة المشروع الآن. راجع المطور لإعادة التفعيل." />;
   }
 
-  if (accessQuery.error) {
-    return <AccessShell icon={<ShieldAlert size={30} />} title="تعذر التحقق من الوصول مؤقتاً" description="لا يعني هذا أن حسابك حُذف. تحقق من الإنترنت ثم أعد المحاولة؛ يبقى حسابك ورمزك محفوظين." action={<button type="button" onClick={() => void accessQuery.refetch()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground transition active:scale-[0.98]"><LogIn size={19} />إعادة التحقق</button>} />;
+  if (accessQuery.error && !offlineLeaseValid) {
+    return <AccessShell icon={<ShieldAlert size={30} />} title="تعذر التحقق من الوصول مؤقتاً" description="تحقق من الإنترنت ثم أعد المحاولة. لا تُحذف صورك المحلية بسبب هذا الخطأ." action={<button type="button" onClick={() => void accessQuery.refetch()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground transition active:scale-[0.98]"><LogIn size={19} />إعادة التحقق</button>} />;
   }
 
   return <>{children}</>;
@@ -49,7 +91,7 @@ function AccessCodeEntry({ onPlatformLogin }: { onPlatformLogin: () => void }) {
     onError: error => {
       const message = /network|fetch|اتصال|networkerror/i.test(error.message || '')
         ? 'تعذر الاتصال مؤقتاً. تحقق من الإنترنت ثم حاول من جديد.'
-        : 'تعذر التحقق من الرمز. راجع الرمز أو جرب الحساب المعتاد.';
+        : error.message || 'تعذر التحقق من الرمز. راجع الرمز أو جرب الحساب المعتاد.';
       setEntryError(message);
       toast.error(message);
     },

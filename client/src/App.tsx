@@ -3,7 +3,6 @@ import React, { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { isFriendTestMode } from "./lib/friendTestMode";
 import { trpc } from './lib/trpc';
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
@@ -44,24 +43,18 @@ function PersonalHome() {
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('batch-visual-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز مساحة الدفعة…" />}><BatchVisualCheck /></Suspense>;
   }
-  const friendTestMode = isFriendTestMode(import.meta.env.VITE_FRIEND_TEST_MODE);
-  const developerEntryRequested = new URLSearchParams(window.location.search).has('developer');
-  // المسار العام متاح للأصدقاء بلا حساب. تبقى الأدوات الخاصة والمزودات
-  // والرسائل خارج هذا المسار، ولا يفتحها إلا رابط المطور المحمي.
-  if (friendTestMode || !developerEntryRequested) {
-    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الاختبار…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
-  }
+  // مسار الإنتاج يمر دائماً عبر بوابة الوصول. وضع الأصدقاء السابق كان
+  // يتجاوز المصادقة ويُبقي التحكم بالمستخدمين خارج المسار؛ فحوص التطوير
+  // أعلاه تبقى محلية فقط ولا تُبنى في نسخة الإنتاج.
   return <ProjectAccessGate />;
 }
 
 function ProjectAccessGate() {
   const modeQuery = trpc.projectAccess.mode.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   if (modeQuery.isLoading) return <LoadingScreen text="جارٍ التحقق من تأمين صفحة الدخول…" />;
-  // عند أي خطأ نتبع الوضع الآمن ولا نفتح التطبيق مباشرة.
-  if (modeQuery.data?.loginRequired !== false) {
-    return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
-  }
-  return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز وضع الدخول المباشر…" />}><AuthenticatedApplication /></Suspense>;
+  // loginRequired لم يعد بوابة تجاوز؛ كل مستخدم يحتاج حساباً أو كوداً.
+  // registrationOpen يوقف الحسابات والأكواد الجديدة فقط، ولا يطرد الجلسات القائمة.
+  return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
 }
 
 function DeviceCheckHome() {

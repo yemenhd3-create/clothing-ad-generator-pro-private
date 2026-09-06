@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../client/src/App';
 
 const { useModeQuery } = vi.hoisted(() => ({
-  useModeQuery: vi.fn(() => ({ isLoading: false, data: { loginRequired: false } })),
+  useModeQuery: vi.fn(() => ({ isLoading: false, data: { loginRequired: true, registrationOpen: true, offlineGraceHours: 72 } })),
 }));
 
 vi.mock('../client/src/lib/trpc', () => ({
@@ -14,21 +14,26 @@ vi.mock('../client/src/lib/trpc', () => ({
   },
 }));
 
-vi.mock('../client/src/components/AuthenticatedApplication', () => ({
-  default: ({ friendTestMode = false }: { friendTestMode?: boolean }) => <div>{friendTestMode ? 'وضع محدود' : 'التطبيق الكامل'}</div>,
+vi.mock('../client/src/components/PersonalAccessGate', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <div><span>بوابة الدخول الإلزامي</span>{children}</div>,
 }));
 
-describe('الدخول المباشر', () => {
+vi.mock('../client/src/components/AuthenticatedApplication', () => ({
+  default: () => <div>التطبيق الكامل</div>,
+}));
+
+describe('الدخول العام', () => {
   afterEach(() => {
     cleanup();
     useModeQuery.mockClear();
     window.history.replaceState({}, '', '/');
   });
 
-  it('يفتح وضع ضيف محدود للأصدقاء من الرابط العادي بلا طلب تسجيل دخول', async () => {
+  it('يمرر المسار العادي عبر بوابة الدخول ولا يفتح Guest Mode', async () => {
     render(<App />);
-    expect(await screen.findByText('وضع محدود')).toBeTruthy();
-    expect(screen.queryByText('التطبيق الكامل')).toBeNull();
-    expect(useModeQuery).not.toHaveBeenCalled();
+    expect(await screen.findByText('بوابة الدخول الإلزامي')).toBeTruthy();
+    expect(screen.queryByText('وضع محدود')).toBeNull();
+    expect(screen.getByText('التطبيق الكامل')).toBeTruthy();
+    expect(useModeQuery).toHaveBeenCalledTimes(1);
   });
 });

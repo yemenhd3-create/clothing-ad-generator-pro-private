@@ -23,7 +23,10 @@ import {
   saveAnnouncement,
   getProjectAccessSettings,
   setProjectLoginRequired,
+  setProjectRegistrationOpen,
+  setProjectOfflineGraceHours,
   setPersonalUserAccess,
+  touchUserPresence,
   updateUserMessageStatus,
 } from './personalWorkspace';
 
@@ -104,6 +107,12 @@ export const appRouter = router({
       setLoginRequired: developerProcedure
         .input(z.object({ loginRequired: z.boolean() }))
         .mutation(({ input }) => setProjectLoginRequired(input.loginRequired)),
+      setRegistrationOpen: developerProcedure
+        .input(z.object({ registrationOpen: z.boolean() }))
+        .mutation(({ input }) => setProjectRegistrationOpen(input.registrationOpen)),
+      setOfflineGraceHours: developerProcedure
+        .input(z.object({ hours: z.number().int().min(0).max(720) }))
+        .mutation(({ input }) => setProjectOfflineGraceHours(input.hours)),
       accessCodes: router({
         list: developerProcedure.query(() => listAccessCodes()),
         create: developerProcedure
@@ -130,6 +139,10 @@ export const appRouter = router({
     redeem: publicProcedure
       .input(z.object({ code: z.string().trim().min(12).max(80) }))
       .mutation(async ({ ctx, input }) => {
+        const settings = await getProjectAccessSettings();
+        if (!settings.registrationOpen) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'التسجيل الجديد متوقف حالياً من لوحة المطور.' });
+        }
         const redeemed = await redeemAccessCode(input.code);
         const remainingMs = redeemed.expiresAt
           ? Math.max(1_000, redeemed.expiresAt.getTime() - Date.now())
@@ -144,6 +157,11 @@ export const appRouter = router({
   }),
   personal: router({
     access: protectedProcedure.query(async ({ ctx }) => assertPersonalUserIsActive(ctx.user.id)),
+    heartbeat: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        await assertPersonalUserIsActive(ctx.user.id);
+        return touchUserPresence(ctx.user.id);
+      }),
     announcement: protectedProcedure.query(async ({ ctx }) => {
       await assertPersonalUserIsActive(ctx.user.id);
       return getActiveAnnouncement();

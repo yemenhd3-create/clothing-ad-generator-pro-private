@@ -21,6 +21,7 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt"),
 });
 
 export type User = typeof users.$inferSelect;
@@ -82,6 +83,8 @@ export type AccessCode = typeof accessCodes.$inferSelect;
 export const projectAccessSettings = mysqlTable("project_access_settings", {
   id: int("id").primaryKey(),
   loginRequired: int("loginRequired").default(1).notNull(),
+  registrationOpen: int("registrationOpen").default(1).notNull(),
+  offlineGraceHours: int("offlineGraceHours").default(72).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

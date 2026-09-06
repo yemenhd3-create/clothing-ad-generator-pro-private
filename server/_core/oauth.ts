@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
+import { getProjectAccessSettings } from "../personalWorkspace";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -37,6 +38,13 @@ export function registerOAuthRoutes(app: Express) {
 
       if (!userInfo.openId) {
         res.status(400).json({ error: "openId missing from user info" });
+        return;
+      }
+
+      const existingUser = await db.getUserByOpenId(userInfo.openId);
+      const accessSettings = await getProjectAccessSettings();
+      if (!existingUser && !accessSettings.registrationOpen) {
+        res.status(403).json({ error: "registration_closed", message: "التسجيل الجديد متوقف حالياً من لوحة المطور." });
         return;
       }
 

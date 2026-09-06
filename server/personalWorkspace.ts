@@ -94,6 +94,7 @@ export async function listPersonalUsers() {
     isDisabled: users.isDisabled,
     createdAt: users.createdAt,
     lastSignedIn: users.lastSignedIn,
+    lastSeenAt: users.lastSeenAt,
   }).from(users).orderBy(desc(users.lastSignedIn));
 }
 
@@ -103,19 +104,43 @@ export async function setPersonalUserAccess(id: number, isDisabled: boolean) {
   return { success: true } as const;
 }
 
+export async function touchUserPresence(userId: number) {
+  const db = requireDb(await getDb());
+  await db.update(users).set({ lastSeenAt: new Date() }).where(eq(users.id, userId));
+  return { success: true, lastSeenAt: new Date() } as const;
+}
+
 export async function getProjectAccessSettings() {
   return settleWithin((async () => {
     const db = requireDb(await getDb());
     const current = (await db.select().from(projectAccessSettings).where(eq(projectAccessSettings.id, 1)).limit(1))[0];
-    if (current) return { loginRequired: current.loginRequired === 1 };
-    await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1 });
-    return { loginRequired: true };
-  })(), 2_500, { loginRequired: true });
+    if (current) return {
+      loginRequired: current.loginRequired === 1,
+      registrationOpen: current.registrationOpen === 1,
+      offlineGraceHours: Math.max(0, current.offlineGraceHours),
+    };
+    await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1, registrationOpen: 1, offlineGraceHours: 72 });
+    return { loginRequired: true, registrationOpen: true, offlineGraceHours: 72 };
+  })(), 2_500, { loginRequired: true, registrationOpen: true, offlineGraceHours: 72 });
 }
 
 export async function setProjectLoginRequired(loginRequired: boolean) {
   const db = requireDb(await getDb());
-  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: loginRequired ? 1 : 0 })
-    .onDuplicateKeyUpdate({ set: { loginRequired: loginRequired ? 1 : 0 } });
+  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: loginRequired ? 1 : 0, registrationOpen: loginRequired ? 1 : 0 })
+    .onDuplicateKeyUpdate({ set: { loginRequired: loginRequired ? 1 : 0, registrationOpen: loginRequired ? 1 : 0 } });
   return { loginRequired };
+}
+
+export async function setProjectRegistrationOpen(registrationOpen: boolean) {
+  const db = requireDb(await getDb());
+  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1, registrationOpen: registrationOpen ? 1 : 0, offlineGraceHours: 72 })
+    .onDuplicateKeyUpdate({ set: { registrationOpen: registrationOpen ? 1 : 0 } });
+  return getProjectAccessSettings();
+}
+
+export async function setProjectOfflineGraceHours(offlineGraceHours: number) {
+  const db = requireDb(await getDb());
+  await db.insert(projectAccessSettings).values({ id: 1, loginRequired: 1, registrationOpen: 1, offlineGraceHours })
+    .onDuplicateKeyUpdate({ set: { offlineGraceHours } });
+  return getProjectAccessSettings();
 }
