@@ -1,0 +1,83 @@
+name: Build & Release Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-signed-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.15.1
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Signing Keystore
+        id: setup-keystore
+        run: |
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/release-key.jks"
+          KEYSTORE_PASS="${{ secrets.APK_KEYSTORE_PASSWORD }}"
+          if [ -z "$KEYSTORE_PASS" ]; then
+            KEYSTORE_PASS="GhorfatAlmalabesSecureKey2026!"
+          fi
+
+          if [ -n "${{ secrets.APK_KEYSTORE_BASE64 }}" ]; then
+            echo "Restoring keystore from GitHub Secrets..."
+            echo "${{ secrets.APK_KEYSTORE_BASE64 }}" | base64 -d > "$KEYSTORE_PATH"
+          else
+            echo "Generating persistent release keystore for owner..."
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -alias marwan-ghorfatalmalabes-release \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASS" \
+              -keypass "$KEYSTORE_PASS" \
+              -dname "CN=Marwan, OU=GhorfatAlmalabes, O=AdGenerator, L=Sanaa, ST=Yemen, C=YE"
+          fi
+
+          echo "APK_KEYSTORE_PATH=$KEYSTORE_PATH" >> $GITHUB_ENV
+          echo "APK_KEYSTORE_PASSWORD=$KEYSTORE_PASS" >> $GITHUB_ENV
+
+      - name: Run Type Check & Tests
+        run: |
+          pnpm check
+          pnpm test
+
+      - name: Build Web Assets
+        run: pnpm build
+
+      - name: Build Signed Android APK
+        run: pnpm android:build
+
+      - name: Upload Signed Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghorfat-almalabes-signed-release-apk
+          path: artifacts/ghorfat-almalabes-release.apk
+
+      - name: Upload Keystore Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-release-keystore-backup
+          path: release-key.jks
