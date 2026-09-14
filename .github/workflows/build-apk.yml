@@ -60,6 +60,10 @@ jobs:
           echo "APK_KEYSTORE_PASSWORD=$KEYSTORE_PASS" >> $GITHUB_ENV
 
       - name: Run Type Check & Tests
+        env:
+          JWT_SECRET: "test-jwt-secret-key-1234567890"
+          DEVELOPER_PANEL_USERNAME: "admin"
+          DEVELOPER_PANEL_PASSWORD: "password123"
         run: |
           pnpm check
           pnpm test
