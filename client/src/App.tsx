@@ -3,7 +3,6 @@ import React, { lazy, Suspense } from "react";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { trpc } from './lib/trpc';
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
@@ -12,16 +11,13 @@ const DeviceCompatibilityCheck = lazy(() => import('./pages/DeviceCompatibilityC
 const LocalBackgroundVisualCheck = lazy(() => import('./components/LocalBackgroundVisualCheck'));
 const ArtworkEditorVisualCheck = lazy(() => import('./components/ArtworkEditorVisualCheck'));
 const BatchVisualCheck = lazy(() => import('./components/BatchVisualCheck'));
-const Home = lazy(() => import('./pages/Home'));
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={PersonalHome} />
       <Route path={"/device-check"} component={DeviceCheckHome} />
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
@@ -43,18 +39,19 @@ function PersonalHome() {
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('batch-visual-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز مساحة الدفعة…" />}><BatchVisualCheck /></Suspense>;
   }
-  // مسار الإنتاج يمر دائماً عبر بوابة الوصول. وضع الأصدقاء السابق كان
-  // يتجاوز المصادقة ويُبقي التحكم بالمستخدمين خارج المسار؛ فحوص التطوير
-  // أعلاه تبقى محلية فقط ولا تُبنى في نسخة الإنتاج.
   return <ProjectAccessGate />;
 }
 
 function ProjectAccessGate() {
-  const modeQuery = trpc.projectAccess.mode.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
-  if (modeQuery.isLoading) return <LoadingScreen text="جارٍ التحقق من تأمين صفحة الدخول…" />;
-  // loginRequired لم يعد بوابة تجاوز؛ كل مستخدم يحتاج حساباً أو كوداً.
-  // registrationOpen يوقف الحسابات والأكواد الجديدة فقط، ولا يطرد الجلسات القائمة.
-  return <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}><PersonalAccessGate><Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}><AuthenticatedApplication /></Suspense></PersonalAccessGate></Suspense>;
+  return (
+    <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}>
+      <PersonalAccessGate>
+        <Suspense fallback={<LoadingScreen text="جارٍ تجهيز مولد الإعلانات…" />}>
+          <AuthenticatedApplication />
+        </Suspense>
+      </PersonalAccessGate>
+    </Suspense>
+  );
 }
 
 function DeviceCheckHome() {
@@ -64,11 +61,6 @@ function DeviceCheckHome() {
 function LoadingScreen({ text }: { text: string }) {
   return <main className="flex min-h-screen items-center justify-center bg-[#fffdf6] p-6" dir="rtl"><section className="rounded-3xl bg-white px-7 py-6 text-center shadow-[0_12px_32px_rgba(37,35,95,0.08)]"><span className="mx-auto block h-7 w-7 animate-spin rounded-full border-[3px] border-primary/20 border-t-primary" /><p className="mt-3 text-sm font-bold text-primary">{text}</p></section></main>;
 }
-
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
 function App() {
   return (
