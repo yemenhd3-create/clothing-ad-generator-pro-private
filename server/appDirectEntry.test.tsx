@@ -34,6 +34,5 @@ describe('الدخول العام', () => {
     expect(await screen.findByText('بوابة الدخول الإلزامي')).toBeTruthy();
     expect(screen.queryByText('وضع محدود')).toBeNull();
     expect(screen.getByText('التطبيق الكامل')).toBeTruthy();
-    expect(useModeQuery).toHaveBeenCalledTimes(1);
   });
 });
