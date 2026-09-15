@@ -11,6 +11,7 @@ const DeviceCompatibilityCheck = lazy(() => import('./pages/DeviceCompatibilityC
 const LocalBackgroundVisualCheck = lazy(() => import('./components/LocalBackgroundVisualCheck'));
 const ArtworkEditorVisualCheck = lazy(() => import('./components/ArtworkEditorVisualCheck'));
 const BatchVisualCheck = lazy(() => import('./components/BatchVisualCheck'));
+const DeveloperWorkspace = lazy(() => import('./components/DeveloperWorkspace'));
 
 function Router() {
   return (
@@ -24,6 +25,9 @@ function Router() {
 }
 
 function PersonalHome() {
+  if (new URLSearchParams(window.location.search).get('developer') === '1') {
+    return <Suspense fallback={<LoadingScreen text="جارٍ فتح لوحة المطور…" />}><DeveloperWorkspace onBack={() => { window.location.href = '/'; }} /></Suspense>;
+  }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('canvas-visual-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة القالب…" />}><CanvasVisualCheck /></Suspense>;
   }
