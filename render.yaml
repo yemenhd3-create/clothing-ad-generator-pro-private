@@ -3,7 +3,7 @@ services:
     name: clothing-ad-generator-pro
     runtime: node
     plan: free
-    buildCommand: pnpm install --frozen-lockfile && pnpm build
+    buildCommand: pnpm install --frozen-lockfile && pnpm db:migrate && pnpm build
     startCommand: pnpm start
     autoDeploy: true
     healthCheckPath: /
