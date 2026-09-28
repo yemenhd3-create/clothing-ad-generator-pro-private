@@ -56,15 +56,27 @@ export const appRouter = router({
       .input(z.object({ username: z.string().min(1), password: z.string().min(1) }))
       .mutation(({ ctx, input }) => {
         if (!authenticateDeveloper(input.username, input.password)) {
+          console.warn('[DeveloperLogin] credential check failed');
           throw new TRPCError({ code: "UNAUTHORIZED", message: "بيانات المطور غير صحيحة" });
         }
-        ctx.res.cookie(DEVELOPER_SESSION_COOKIE, issueDeveloperSession(), {
-          ...getSessionCookieOptions(ctx.req),
-          maxAge: DEVELOPER_SESSION_MAX_AGE_MS,
-        });
+        const cookieOpts = { ...getSessionCookieOptions(ctx.req), maxAge: DEVELOPER_SESSION_MAX_AGE_MS };
+        try {
+          const token = issueDeveloperSession();
+          ctx.res.cookie(DEVELOPER_SESSION_COOKIE, token, cookieOpts);
+          console.warn('[DeveloperLogin] cookie set', { cookieOpts, tokenLen: token.length });
+        } catch (err) {
+          console.warn('[DeveloperLogin] FAILED to issue/set cookie', String(err));
+          throw err;
+        }
         return { authenticated: true } as const;
       }),
-    status: publicProcedure.query(({ ctx }) => ({ authenticated: isDeveloperSession(ctx.req) })),
+    status: publicProcedure.query(({ ctx }) => {
+      const rawCookieHeader = ctx.req.headers.cookie ?? '';
+      const hasDevCookieSubstring = rawCookieHeader.includes(DEVELOPER_SESSION_COOKIE);
+      const authenticated = isDeveloperSession(ctx.req);
+      console.warn('[DeveloperStatus] check', { hasCookieHeaderAtAll: !!rawCookieHeader, hasDevCookieSubstring, authenticated });
+      return { authenticated };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.res.clearCookie(DEVELOPER_SESSION_COOKIE, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
       return { success: true } as const;
