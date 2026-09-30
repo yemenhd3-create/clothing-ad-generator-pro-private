@@ -8,7 +8,7 @@ import React, { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 export default function PersonalAccessGate({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
   const accessQuery = trpc.personal.access.useQuery(undefined, {
     enabled: isAuthenticated && isOnline,
