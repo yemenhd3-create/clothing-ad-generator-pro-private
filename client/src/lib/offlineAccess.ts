@@ -1,3 +1,6 @@
+import { jwtVerify, importJWK } from 'jose';
+import { OFFLINE_LEASE_PUBLIC_JWK } from './offlinePublicKey';
+
 const OFFLINE_LEASE_KEY = 'clothing-ad-offline-lease-v1';
 const LEGACY_OFFLINE_LEASE_KEY = 'clothing-ad-generator:offline-lease-v1';
 
@@ -8,7 +11,33 @@ export type OfflineLease = {
   lastSeenAt?: number;
 };
 
-export function parseJwtPayload(token: string): { exp?: number; iat?: number; sub?: string; graceHours?: number } | null {
+export type OfflineJwtClaims = {
+  sub?: string;
+  graceHours?: number;
+  type?: string;
+  iat?: number;
+  exp?: number;
+};
+
+/**
+ * Genuine asymmetric cryptographic verification of an offline lease token.
+ * Uses the embedded ES256 public key (without exposing any server secrets).
+ * Returns decoded claims if valid, or null if tampered, forged, or expired.
+ */
+export async function verifyOfflineLeaseTokenCryptographically(
+  token: string
+): Promise<OfflineJwtClaims | null> {
+  try {
+    const publicKey = await importJWK(OFFLINE_LEASE_PUBLIC_JWK, 'ES256');
+    const { payload } = await jwtVerify(token, publicKey);
+    if (payload.type !== 'offline_lease') return null;
+    return payload as OfflineJwtClaims;
+  } catch {
+    return null;
+  }
+}
+
+export function parseJwtPayload(token: string): OfflineJwtClaims | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
