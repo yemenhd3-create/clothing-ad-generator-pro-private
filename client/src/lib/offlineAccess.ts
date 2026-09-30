@@ -107,7 +107,12 @@ export function saveOfflineLease(graceHours: number, token?: string): OfflineLea
   return lease;
 }
 
-export function hasValidOfflineLease(now = Date.now()): boolean {
+/**
+ * Checks if a locally stored lease is valid at the given time.
+ * If expectedUserId is supplied, ensures the lease token belongs to that specific user.
+ * Tokens belonging to another user are rejected and immediately cleared.
+ */
+export function hasValidOfflineLease(now = Date.now(), expectedUserId?: number | string): boolean {
   const lease = readOfflineLease();
   if (!lease) return false;
 
@@ -129,6 +134,15 @@ export function hasValidOfflineLease(now = Date.now()): boolean {
     return false;
   }
 
+  // 4. User identity binding: reject if token belongs to a different user
+  if (expectedUserId !== undefined && lease.token) {
+    const claims = parseJwtPayload(lease.token);
+    if (!claims || claims.sub !== String(expectedUserId)) {
+      clearOfflineLease();
+      return false;
+    }
+  }
+
   // Update lastSeenAt to prevent backward clock tampering during offline session
   try {
     lease.lastSeenAt = now;
@@ -138,6 +152,32 @@ export function hasValidOfflineLease(now = Date.now()): boolean {
   }
 
   return true;
+}
+
+/**
+ * Cryptographically verifies the offline lease on device startup.
+ * Confirms ES256 signature against public key, verifies user ID matching,
+ * and guards against time tampering.
+ */
+export async function verifyOfflineLeaseCryptographically(
+  expectedUserId?: number | string,
+  now = Date.now()
+): Promise<boolean> {
+  const lease = readOfflineLease();
+  if (!lease || !lease.token) return false;
+
+  const claims = await verifyOfflineLeaseTokenCryptographically(lease.token);
+  if (!claims) {
+    clearOfflineLease();
+    return false;
+  }
+
+  if (expectedUserId !== undefined && claims.sub !== String(expectedUserId)) {
+    clearOfflineLease();
+    return false;
+  }
+
+  return hasValidOfflineLease(now, expectedUserId);
 }
 
 export function clearOfflineLease() {

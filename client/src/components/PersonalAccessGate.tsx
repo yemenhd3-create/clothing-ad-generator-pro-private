@@ -46,7 +46,16 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isOnline]);
 
-  const offlineLeaseValid = !isOnline && hasValidOfflineLease();
+  const effectiveUserId = user?.id ?? (() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const raw = localStorage.getItem('manus-runtime-user-info');
+      return raw ? JSON.parse(raw)?.id : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  const offlineLeaseValid = !isOnline && hasValidOfflineLease(Date.now(), effectiveUserId);
   const modeLoading = isOnline && modeQuery.isLoading;
 
   if (loading || modeLoading || (isAuthenticated && isOnline && accessQuery.isLoading)) {
