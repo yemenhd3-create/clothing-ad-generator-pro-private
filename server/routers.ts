@@ -1,3 +1,4 @@
+import { createOfflineLeaseToken } from "./offlineToken";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -160,7 +161,10 @@ export const appRouter = router({
     heartbeat: protectedProcedure
       .mutation(async ({ ctx }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        return touchUserPresence(ctx.user.id);
+        const presence = await touchUserPresence(ctx.user.id);
+        const settings = await getProjectAccessSettings();
+        const offlineLeaseToken = await createOfflineLeaseToken(ctx.user.id, settings.offlineGraceHours);
+        return { ...presence, offlineLeaseToken };
       }),
     announcement: protectedProcedure.query(async ({ ctx }) => {
       await assertPersonalUserIsActive(ctx.user.id);

@@ -1,9 +1,29 @@
 const OFFLINE_LEASE_KEY = 'clothing-ad-offline-lease-v1';
+const LEGACY_OFFLINE_LEASE_KEY = 'clothing-ad-generator:offline-lease-v1';
 
 export type OfflineLease = {
   verifiedAt: number;
   expiresAt: number;
+  token?: string;
+  lastSeenAt?: number;
 };
+
+export function parseJwtPayload(token: string): { exp?: number; iat?: number; sub?: string; graceHours?: number } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
 
 export function readOfflineLease(): OfflineLease | null {
   if (typeof window === 'undefined') return null;
@@ -12,34 +32,89 @@ export function readOfflineLease(): OfflineLease | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<OfflineLease>;
     if (!Number.isFinite(parsed.verifiedAt) || !Number.isFinite(parsed.expiresAt)) return null;
-    return { verifiedAt: Number(parsed.verifiedAt), expiresAt: Number(parsed.expiresAt) };
+    return {
+      verifiedAt: Number(parsed.verifiedAt),
+      expiresAt: Number(parsed.expiresAt),
+      token: typeof parsed.token === 'string' ? parsed.token : undefined,
+      lastSeenAt: Number.isFinite(parsed.lastSeenAt) ? Number(parsed.lastSeenAt) : undefined,
+    };
   } catch {
     return null;
   }
 }
 
-export function saveOfflineLease(graceHours: number): OfflineLease {
+export function saveOfflineLease(graceHours: number, token?: string): OfflineLease {
   const now = Date.now();
+  let verifiedAt = now;
+  let expiresAt = now + Math.max(0, graceHours) * 60 * 60 * 1000;
+
+  if (token) {
+    const claims = parseJwtPayload(token);
+    if (claims?.exp && Number.isFinite(claims.exp)) {
+      expiresAt = claims.exp * 1000;
+    }
+    if (claims?.iat && Number.isFinite(claims.iat)) {
+      verifiedAt = claims.iat * 1000;
+    }
+  }
+
   const lease: OfflineLease = {
-    verifiedAt: now,
-    expiresAt: now + Math.max(0, graceHours) * 60 * 60 * 1000,
+    verifiedAt,
+    expiresAt,
+    token: token || undefined,
+    lastSeenAt: now,
   };
+
+  if (graceHours <= 0 || expiresAt <= now) {
+    clearOfflineLease();
+    return lease;
+  }
+
   try {
     window.localStorage.setItem(OFFLINE_LEASE_KEY, JSON.stringify(lease));
   } catch {
-    // Private browsing or a restricted WebView may not allow local storage.
+    // Storage cleanup or private browsing fallback
   }
   return lease;
 }
 
 export function hasValidOfflineLease(now = Date.now()): boolean {
   const lease = readOfflineLease();
-  return Boolean(lease && lease.expiresAt > now);
+  if (!lease) return false;
+
+  // 1. Expiry check
+  if (lease.expiresAt <= now) {
+    clearOfflineLease();
+    return false;
+  }
+
+  // 2. Anti-rollback check: system clock moved back before token creation
+  if (now < lease.verifiedAt) {
+    clearOfflineLease();
+    return false;
+  }
+
+  // 3. Anti-rollback check: system clock moved back before last recorded usage
+  if (lease.lastSeenAt && now < lease.lastSeenAt) {
+    clearOfflineLease();
+    return false;
+  }
+
+  // Update lastSeenAt to prevent backward clock tampering during offline session
+  try {
+    lease.lastSeenAt = now;
+    window.localStorage.setItem(OFFLINE_LEASE_KEY, JSON.stringify(lease));
+  } catch {
+    // Ignore storage update errors
+  }
+
+  return true;
 }
 
 export function clearOfflineLease() {
   try {
     window.localStorage.removeItem(OFFLINE_LEASE_KEY);
+    window.localStorage.removeItem(LEGACY_OFFLINE_LEASE_KEY);
   } catch {
     // Ignore storage cleanup failures.
   }

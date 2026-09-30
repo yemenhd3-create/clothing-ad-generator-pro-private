@@ -22,8 +22,8 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
     enabled: isOnline,
   });
   const heartbeat = trpc.personal.heartbeat.useMutation({
-    onSuccess: () => {
-      saveOfflineLease(modeQuery.data?.offlineGraceHours ?? 72);
+    onSuccess: (data: any) => {
+      saveOfflineLease(modeQuery.data?.offlineGraceHours ?? 72, data?.offlineLeaseToken);
     },
     onError: error => {
       if (/FORBIDDEN|موقوف|disabled/i.test(error.message)) clearOfflineLease();
