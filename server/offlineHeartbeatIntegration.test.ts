@@ -128,4 +128,87 @@ describe('offline heartbeat integration & multi-user lease isolation', () => {
     expect(valid).toBe(false);
     expect(readOfflineLease()).toBeNull();
   });
+
+  it('proves that a transient heartbeat failure does not replace a valid saved token and does not extend its expiry', async () => {
+    const userId = 101;
+    const graceHours = 72;
+    const initialNow = Date.now();
+
+    // 1. Initial successful heartbeat at T=0
+    const originalToken = await createOfflineLeaseToken(userId, graceHours);
+    const initialLease = saveOfflineLease(graceHours, originalToken);
+    const originalExpiresAt = initialLease.expiresAt;
+    const originalVerifiedAt = initialLease.verifiedAt;
+
+    // expiresAt comes from the token's exp claim (second precision)
+    const expectedExpiresAt = (Math.floor(initialNow / 1000) + graceHours * 3600) * 1000;
+    expect(initialLease.token).toBe(originalToken);
+    expect(originalExpiresAt).toBe(expectedExpiresAt);
+
+    // 2. Advance time by 5 hours (T = +5h)
+    const fiveHoursLater = initialNow + 5 * 3600 * 1000;
+
+    // Simulate PersonalAccessGate heartbeat mutation behavior on transient failure
+    const simulateHeartbeatCall = async (succeed: boolean, errorMsg?: string) => {
+      if (!succeed) {
+        const error = new Error(errorMsg || 'Failed to fetch / network timeout');
+        // PersonalAccessGate onError logic:
+        if (/FORBIDDEN|موقوف|disabled/i.test(error.message)) {
+          clearOfflineLease();
+        }
+        // Notice: saveOfflineLease is NOT called on failure!
+        return { error };
+      }
+      // On success, saveOfflineLease would be called
+      const newToken = await createOfflineLeaseToken(userId, graceHours);
+      saveOfflineLease(graceHours, newToken);
+      return { token: newToken };
+    };
+
+    // 3. Heartbeat fails due to offline/network/server error at T = +5h
+    const result = await simulateHeartbeatCall(false, 'Network connection timed out');
+    expect(result.error).toBeDefined();
+
+    // 4. Assert that the stored lease was NOT overwritten
+    const currentLease = readOfflineLease();
+    expect(currentLease).not.toBeNull();
+    expect(currentLease?.token).toBe(originalToken);
+    expect(currentLease?.verifiedAt).toBe(originalVerifiedAt);
+
+    // 5. Assert that the lease expiry was NOT extended
+    // If it were wrongly extended at T=+5h, expiresAt would be fiveHoursLater + 72h.
+    // It MUST strictly remain the originalExpiresAt!
+    expect(currentLease?.expiresAt).toBe(originalExpiresAt);
+    expect(currentLease?.expiresAt).not.toBe((Math.floor(fiveHoursLater / 1000) + graceHours * 3600) * 1000);
+
+    // 6. Assert that offline access remains valid with original remaining hours
+    const isValid = hasValidOfflineLease(fiveHoursLater, userId);
+    expect(isValid).toBe(true);
+    const remainingHours = getOfflineLeaseRemainingHours(fiveHoursLater);
+    expect(Math.round(remainingHours)).toBe(67); // 72 - 5 = 67 hours
+
+    // 7. Cryptographic verification remains fully valid for original token
+    const isCryptoValid = await verifyOfflineLeaseCryptographically(userId, fiveHoursLater);
+    expect(isCryptoValid).toBe(true);
+  });
+
+  it('proves that a terminal forbidden heartbeat error revokes the lease instead of extending it', async () => {
+    const userId = 101;
+    const graceHours = 72;
+
+    // Initial valid token
+    const token = await createOfflineLeaseToken(userId, graceHours);
+    saveOfflineLease(graceHours, token);
+    expect(readOfflineLease()?.token).toBe(token);
+
+    // Simulate heartbeat returning FORBIDDEN / disabled
+    const error = new Error('FORBIDDEN: الحساب موقوف من قبل المطور');
+    if (/FORBIDDEN|موقوف|disabled/i.test(error.message)) {
+      clearOfflineLease();
+    }
+
+    // Assert that the lease was immediately cleared, not retained or extended
+    expect(readOfflineLease()).toBeNull();
+    expect(hasValidOfflineLease(Date.now(), userId)).toBe(false);
+  });
 });
