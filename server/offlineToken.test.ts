@@ -1,6 +1,20 @@
-import { describe, expect, it } from 'vitest';
-import { createOfflineLeaseToken, verifyOfflineLeaseToken } from './offlineToken';
-import { verifyOfflineLeaseTokenCryptographically } from '../client/src/lib/offlineAccess';
+import { describe, expect, it, vi } from 'vitest';
+
+// The real public key file holds the PRODUCTION public key. For tests we mock
+// it with the dedicated test-only public key (paired with the test-only
+// private key set in server/testSetup.ts), so no production key material is
+// ever needed to run the test suite.
+vi.mock('../client/src/lib/offlinePublicKey', () => ({
+  OFFLINE_LEASE_PUBLIC_JWK: {
+    kty: 'EC',
+    crv: 'P-256',
+    x: 'sZVDcDvW5uhltRbQp1xj4OZO2G7H0hoEb1lOXNYko6o',
+    y: '_Y-Ui4tXRZF_KGsgOjKhMMH14zVkX4W5pqzbwtkuMEA',
+  },
+}));
+
+const { createOfflineLeaseToken, verifyOfflineLeaseToken } = await import('./offlineToken');
+const { verifyOfflineLeaseTokenCryptographically } = await import('../client/src/lib/offlineAccess');
 
 describe('asymmetric offline lease token (ES256)', () => {
   it('server creates token with private key and client verifies with public key', async () => {

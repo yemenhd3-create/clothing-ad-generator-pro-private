@@ -7,6 +7,6 @@
 export const OFFLINE_LEASE_PUBLIC_JWK = {
   kty: 'EC',
   crv: 'P-256',
-  x: '4Ghqcut1XtiByC5dspobhfhePD1GUkoANx22bvBHpNg',
-  y: 'zWb5YevfwL1u1r_Qw2RX4br1Oa453kZ5QwFK87uAltw',
+  x: 'pAdZpOUFuaYQlnLWIx0Iq1dKcVTg5S-Z31jf1DuP3kc',
+  y: '_FCa2O1O71ppRQKkXK1bSb6_lPiJxqnL3MtLJdQvJnU',
 } as const;
