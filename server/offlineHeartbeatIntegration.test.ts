@@ -1,5 +1,16 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Dedicated test-only public key paired with the test-only private key in server/testSetup.ts
+vi.mock('../client/src/lib/offlinePublicKey', () => ({
+  OFFLINE_LEASE_PUBLIC_JWK: {
+    kty: 'EC',
+    crv: 'P-256',
+    x: 'sZVDcDvW5uhltRbQp1xj4OZO2G7H0hoEb1lOXNYko6o',
+    y: '_Y-Ui4tXRZF_KGsgOjKhMMH14zVkX4W5pqzbwtkuMEA',
+  },
+}));
+
 import { createOfflineLeaseToken } from './offlineToken';
 import {
   clearOfflineLease,
@@ -104,7 +115,7 @@ describe('offline heartbeat integration & multi-user lease isolation', () => {
     const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
     decodedPayload.sub = String(impersonatedUserId);
     const forgedPayloadB64 = Buffer.from(JSON.stringify(decodedPayload)).toString('base64url');
-    const forgedToken = `${header}.${forgedPayloadB64}.${signature}`;
+    const forgedToken = ;
 
     saveOfflineLease(graceHours, forgedToken);
 
