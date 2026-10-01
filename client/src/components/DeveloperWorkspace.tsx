@@ -396,7 +396,6 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
         </section>
       )}
 
-      {activeSection === 'templates' && renderTemplateEditor()}
       {activeSection === 'providers' && <Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المزودين…</section>}><DeveloperProviderTools onDiagnostic={addDiagnostic} /></Suspense>}
       {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
       {activeSection === 'system' && (
