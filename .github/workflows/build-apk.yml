@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-signed-apk:
+  build-apk:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -18,7 +18,7 @@ jobs:
           node-version: 22
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 10.15.1
 
@@ -31,7 +31,7 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup Signing Keystore
+      - name: Setup Signing Keystore (Optional)
         id: setup-keystore
         shell: bash
         env:
@@ -41,17 +41,15 @@ jobs:
           set -euo pipefail
           KEYSTORE_PATH="$GITHUB_WORKSPACE/release-key.jks"
 
-         # if [ -z "${APK_KEYSTORE_PASSWORD:-}" ] || [ -z "${APK_KEYSTORE_BASE64:-}" ]; then
-         #   echo "Required Android signing secrets are not configured." >&2
-          #  echo "Configure APK_KEYSTORE_PASSWORD and APK_KEYSTORE_BASE64 in GitHub Actions Secrets before producing a release APK." >&2
-          #  exit 1
-         # fi
-
-          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
-          chmod 600 "$KEYSTORE_PATH"
-
-          echo "APK_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "APK_KEYSTORE_PASSWORD=$APK_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          if [ -n "${APK_KEYSTORE_BASE64:-}" ] && [ -n "${APK_KEYSTORE_PASSWORD:-}" ]; then
+            echo "Configuring signing keystore..."
+            printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+            chmod 600 "$KEYSTORE_PATH"
+            echo "APK_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "APK_KEYSTORE_PASSWORD=$APK_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo "No keystore secrets found; building unsigned/debug APK for field testing."
+          fi
 
       - name: Create ephemeral CI test credentials
         shell: bash
@@ -71,13 +69,12 @@ jobs:
       - name: Build Web Assets
         run: pnpm build
 
-      - name: Build Signed Android APK
+      - name: Build Android APK
         run: pnpm android:build
 
-      - name: Upload Signed Release APK Artifact
+      - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ghorfat-almalabes-signed-release-apk
-          path: artifacts/ghorfat-almalabes-release.apk
+          name: ghorfat-almalabes-apk
+          path: artifacts/*.apk
           if-no-files-found: error
-
