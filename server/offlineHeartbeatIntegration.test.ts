@@ -115,7 +115,7 @@ describe('offline heartbeat integration & multi-user lease isolation', () => {
     const decodedPayload = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
     decodedPayload.sub = String(impersonatedUserId);
     const forgedPayloadB64 = Buffer.from(JSON.stringify(decodedPayload)).toString('base64url');
-    const forgedToken = ;
+    const forgedToken = `${header}.${forgedPayloadB64}.${signature}`;
 
     saveOfflineLease(graceHours, forgedToken);
 
