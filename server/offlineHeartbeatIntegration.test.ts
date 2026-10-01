@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createOfflineLeaseToken } from './offlineToken';
 import {
@@ -9,6 +9,18 @@ import {
   verifyOfflineLeaseCryptographically,
   getOfflineLeaseRemainingHours,
 } from '../client/src/lib/offlineAccess';
+
+// In-memory localStorage mock for node environment
+const store = new Map<string, string>();
+const localStorageMock = {
+  getItem: (key: string) => store.get(key) ?? null,
+  setItem: (key: string, val: string) => store.set(key, String(val)),
+  removeItem: (key: string) => store.delete(key),
+  clear: () => store.clear(),
+};
+(globalThis as any).localStorage = localStorageMock;
+(globalThis as any).window = globalThis;
+
 
 describe('offline heartbeat integration & multi-user lease isolation', () => {
   beforeEach(() => {
