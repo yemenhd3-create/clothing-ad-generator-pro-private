@@ -1,3 +1,7 @@
+# REFERENCE ONLY - disabled legacy workflow (was ".github/workflows/build-apk.yml`").
+# Hardcoded keystore password fallback REDACTED. Do NOT re-enable the "Upload Keystore Backup Artifact" step:
+# uploading a signing keystore as a build artifact exposes it.
+
 name: Build & Release Android APK
 
 on:
@@ -37,7 +41,7 @@ jobs:
           KEYSTORE_PATH="$GITHUB_WORKSPACE/release-key.jks"
           KEYSTORE_PASS="${{ secrets.APK_KEYSTORE_PASSWORD }}"
           if [ -z "$KEYSTORE_PASS" ]; then
-            KEYSTORE_PASS="GhorfatAlmalabesSecureKey2026!"
+            echo "ERROR: APK_KEYSTORE_PASSWORD secret is required (hardcoded fallback removed)"; exit 1
           fi
 
           if [ -n "${{ secrets.APK_KEYSTORE_BASE64 }}" ]; then
