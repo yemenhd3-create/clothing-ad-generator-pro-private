@@ -131,9 +131,14 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
       addDiagnostic('success', 'نجح التحقق الخادمي من بيانات دخول المطور.');
       await utils.developer.status.invalidate();
     },
-    onError: () => {
-      setNotice('اسم المستخدم أو كلمة المرور غير صحيحين.');
-      addDiagnostic('error', 'فشلت محاولة فتح لوحة المطور.');
+    onError: (err) => {
+      const isNetworkError = /Failed to fetch|NetworkError|Network request failed|Load failed/i.test(err.message || '');
+      if (isNetworkError) {
+        setNotice('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+      } else {
+        setNotice(err.message || 'اسم المستخدم أو كلمة المرور غير صحيحين.');
+      }
+      addDiagnostic('error', `فشلت محاولة فتح لوحة المطور: ${err.message || 'خطأ غير معروف'}`);
     },
   });
 

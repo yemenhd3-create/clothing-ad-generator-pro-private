@@ -37,10 +37,31 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+function getTrpcBaseUrl(): string {
+  // In development mode (Vite dev server), use relative path to allow Vite proxying
+  if (import.meta.env.DEV) {
+    return "/api/trpc";
+  }
+
+  // In Capacitor APK / mobile WebView or standalone local file
+  if (
+    typeof window !== "undefined" &&
+    (window.location.protocol === "capacitor:" ||
+      window.location.protocol === "ionic:" ||
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1")
+  ) {
+    const remoteUrl = import.meta.env.VITE_API_URL || "https://production-v2-0-0.onrender.com";
+    return `${remoteUrl.replace(/\/$/, "")}/api/trpc`;
+  }
+
+  return "/api/trpc";
+}
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: getTrpcBaseUrl(),
       transformer: superjson,
       headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
