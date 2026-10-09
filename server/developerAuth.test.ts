@@ -27,7 +27,7 @@ describe('developer.login', () => {
 
     const { ctx, cookies } = createPublicContext();
     const caller = appRouter.createCaller(ctx);
-    await expect(caller.developer.login({ username: username!, password: password! })).resolves.toEqual({
+    await expect(caller.developer.login({ username: username!, password: password! })).resolves.toMatchObject({
       authenticated: true,
     });
     expect(cookies).toHaveLength(1);

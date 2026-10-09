@@ -125,10 +125,16 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   };
 
   const loginMutation = trpc.developer.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
+      if (data?.token) {
+        try {
+          localStorage.setItem('clothing_ad_developer_token', data.token);
+        } catch {}
+      }
       setPassword('');
       setNotice('تم فتح لوحة المطور.');
       addDiagnostic('success', 'نجح التحقق الخادمي من بيانات دخول المطور.');
+      utils.developer.status.setData(undefined, { authenticated: true });
       await utils.developer.status.invalidate();
     },
     onError: (err) => {
@@ -144,8 +150,12 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
 
   const logoutMutation = trpc.developer.logout.useMutation({
     onSuccess: async () => {
+      try {
+        localStorage.removeItem('clothing_ad_developer_token');
+      } catch {}
       setNotice('تم إغلاق لوحة المطور.');
       addDiagnostic('info', 'تم إنهاء جلسة المطور.');
+      utils.developer.status.setData(undefined, { authenticated: false });
       await utils.developer.status.invalidate();
     },
   });

@@ -64,24 +64,37 @@ const trpcClient = trpc.createClient({
       url: getTrpcBaseUrl(),
       transformer: superjson,
       headers() {
-        // Preview auto-login fallback: when the browser blocks iframe cookies
-        // (Safari ITP / private browsing / WebView), the runtime mirrors the
-        // session into sessionStorage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
+        const headers: Record<string, string> = {};
+
+        // 1. Developer session token (for mobile APK & cross-origin WebView)
         try {
+          const devToken = localStorage.getItem("clothing_ad_developer_token");
+          if (devToken) {
+            headers["x-developer-session"] = devToken;
+          }
+        } catch {}
+
+        // 2. User session token (saved permanently in localStorage across app restarts)
+        try {
+          const userToken = localStorage.getItem("clothing_ad_user_token");
+          if (userToken) {
+            headers["Authorization"] = `Bearer ${userToken}`;
+            return headers;
+          }
+
           const raw = sessionStorage.getItem("manus-cookie");
           if (raw) {
             const prefix = `${COOKIE_NAME}=`;
             const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
             const token = pair?.trim().slice(prefix.length);
             if (token) {
-              return { Authorization: `Bearer ${token}` };
+              headers["Authorization"] = `Bearer ${token}`;
+              return headers;
             }
           }
-        } catch {
-          // sessionStorage unavailable
-        }
-        return {};
+        } catch {}
+
+        return headers;
       },
       fetch(input, init) {
         return globalThis.fetch(input, {

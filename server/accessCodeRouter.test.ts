@@ -44,7 +44,7 @@ describe('مسار استبدال رمز الدخول', () => {
 
     const result = await appRouter.createCaller(ctx).accessCodes.redeem({ code: 'CAG-ABCDE-12345' });
 
-    expect(result).toEqual({ success: true });
+    expect(result).toMatchObject({ success: true, token: 'signed-access-session' });
     expect(mocks.redeemAccessCode).toHaveBeenCalledWith('CAG-ABCDE-12345');
     expect(mocks.createSessionToken).toHaveBeenCalledWith('access_demo', { name: 'وصول برمز: اختبار', expiresInMs: undefined });
     expect(cookies).toHaveLength(1);
