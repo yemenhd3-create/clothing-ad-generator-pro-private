@@ -125,22 +125,37 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
   };
 
   const loginMutation = trpc.developer.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async (data: any) => {
+      if (data?.token) {
+        try {
+          localStorage.setItem('clothing_ad_developer_token', data.token);
+        } catch {}
+      }
       setPassword('');
       setNotice('تم فتح لوحة المطور.');
       addDiagnostic('success', 'نجح التحقق الخادمي من بيانات دخول المطور.');
+      utils.developer.status.setData(undefined, { authenticated: true });
       await utils.developer.status.invalidate();
     },
-    onError: () => {
-      setNotice('اسم المستخدم أو كلمة المرور غير صحيحين.');
-      addDiagnostic('error', 'فشلت محاولة فتح لوحة المطور.');
+    onError: (err) => {
+      const isNetworkError = /Failed to fetch|NetworkError|Network request failed|Load failed/i.test(err.message || '');
+      if (isNetworkError) {
+        setNotice('تعذر الاتصال بالخادم. يرجى التحقق من اتصال الإنترنت.');
+      } else {
+        setNotice(err.message || 'اسم المستخدم أو كلمة المرور غير صحيحين.');
+      }
+      addDiagnostic('error', `فشلت محاولة فتح لوحة المطور: ${err.message || 'خطأ غير معروف'}`);
     },
   });
 
   const logoutMutation = trpc.developer.logout.useMutation({
     onSuccess: async () => {
+      try {
+        localStorage.removeItem('clothing_ad_developer_token');
+      } catch {}
       setNotice('تم إغلاق لوحة المطور.');
       addDiagnostic('info', 'تم إنهاء جلسة المطور.');
+      utils.developer.status.setData(undefined, { authenticated: false });
       await utils.developer.status.invalidate();
     },
   });
@@ -396,7 +411,6 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
         </section>
       )}
 
-      {activeSection === 'templates' && renderTemplateEditor()}
       {activeSection === 'providers' && <Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح أدوات المزودين…</section>}><DeveloperProviderTools onDiagnostic={addDiagnostic} /></Suspense>}
       {activeSection === 'keys' && <><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح المحادثة الخاصة…</section>}><PrivateKeyChat /></Suspense><Suspense fallback={<section className="rounded-[24px] bg-secondary p-6 text-center text-sm text-muted-foreground shadow-[0_12px_30px_rgba(37,35,95,0.06)]">جارٍ فتح كتالوج النماذج…</section>}><OpenImageModelsCatalog /></Suspense></>}
       {activeSection === 'system' && (

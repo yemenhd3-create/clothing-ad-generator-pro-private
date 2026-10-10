@@ -13,6 +13,7 @@ import { removeBackgroundFromProduct, runProductToModelTryOn } from './tryOn';
 import { generateMarketingTextWithFallback } from './marketingText';
 import { getConnectedLeaderReply } from './connectedLeader';
 import { createAccessCode, listAccessCodes, redeemAccessCode, revokeAccessCode } from './accessCodes';
+import { getUserByOpenId } from './db';
 import { sdk } from './_core/sdk';
 import {
   createUserMessage,
@@ -59,11 +60,12 @@ export const appRouter = router({
         if (!authenticateDeveloper(input.username, input.password)) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "بيانات المطور غير صحيحة" });
         }
-        ctx.res.cookie(DEVELOPER_SESSION_COOKIE, issueDeveloperSession(), {
+        const sessionToken = issueDeveloperSession();
+        ctx.res.cookie(DEVELOPER_SESSION_COOKIE, sessionToken, {
           ...getSessionCookieOptions(ctx.req),
           maxAge: DEVELOPER_SESSION_MAX_AGE_MS,
         });
-        return { authenticated: true } as const;
+        return { authenticated: true, success: true, token: sessionToken } as const;
       }),
     status: publicProcedure.query(({ ctx }) => ({ authenticated: isDeveloperSession(ctx.req) })),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -148,12 +150,31 @@ export const appRouter = router({
         const remainingMs = redeemed.expiresAt
           ? Math.max(1_000, redeemed.expiresAt.getTime() - Date.now())
           : undefined;
+        const remainingHours = remainingMs ? Math.ceil(remainingMs / (3600 * 1000)) : 24 * 365;
         const token = await sdk.createSessionToken(redeemed.openId, { name: redeemed.name, expiresInMs: remainingMs });
         ctx.res.cookie(COOKIE_NAME, token, {
           ...getSessionCookieOptions(ctx.req),
           maxAge: remainingMs,
         });
-        return { success: true } as const;
+
+        const user = await getUserByOpenId(redeemed.openId);
+        let offlineLeaseToken: string | undefined = undefined;
+        if (user?.id) {
+          try {
+            offlineLeaseToken = await createOfflineLeaseToken(user.id, Math.min(remainingHours, 720));
+          } catch (e) {
+            console.warn('[Offline Lease] Failed to create offline lease on redeem:', e);
+          }
+        }
+
+        return {
+          success: true,
+          token,
+          user: user ?? null,
+          expiresAt: redeemed.expiresAt ? redeemed.expiresAt.toISOString() : null,
+          offlineLeaseToken,
+          graceHours: Math.min(remainingHours, 720),
+        } as const;
       }),
   }),
   personal: router({

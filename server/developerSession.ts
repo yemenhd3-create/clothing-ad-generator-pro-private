@@ -23,7 +23,11 @@ export function issueDeveloperSession() {
 }
 
 export function isDeveloperSession(req: Pick<Request, 'headers'>): boolean {
-  const token = parse(req.headers.cookie ?? '')[DEVELOPER_SESSION_COOKIE];
+  const rawHeader = req.headers['x-developer-session'] ?? req.headers['x-developer-token'];
+  const headerToken = Array.isArray(rawHeader) ? rawHeader[0] : (typeof rawHeader === 'string' ? rawHeader : undefined);
+
+  const cookieToken = parse(req.headers.cookie ?? '')[DEVELOPER_SESSION_COOKIE];
+  const token = headerToken || cookieToken;
   if (!token) return false;
 
   const [expiresAtRaw, receivedSignature] = token.split('.');

@@ -96,7 +96,23 @@ function AccessCodeEntry({ onPlatformLogin }: { onPlatformLogin: () => void }) {
   const [code, setCode] = useState('');
   const [entryError, setEntryError] = useState('');
   const redeem = trpc.accessCodes.redeem.useMutation({
-    onSuccess: () => window.location.reload(),
+    onSuccess: (data: any) => {
+      if (data?.token) {
+        try {
+          localStorage.setItem('clothing_ad_user_token', data.token);
+        } catch {}
+      }
+      if (data?.user) {
+        try {
+          localStorage.setItem('manus-runtime-user-info', JSON.stringify(data.user));
+        } catch {}
+      }
+      if (data?.offlineLeaseToken) {
+        saveOfflineLease(data.graceHours ?? 72, data.offlineLeaseToken);
+      }
+      toast.success('تم تفعيل رمز الدخول بنجاح!');
+      window.location.reload();
+    },
     onError: error => {
       const message = /network|fetch|اتصال|networkerror/i.test(error.message || '')
         ? 'تعذر الاتصال مؤقتاً. تحقق من الإنترنت ثم حاول من جديد.'
