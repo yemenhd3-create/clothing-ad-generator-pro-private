@@ -346,7 +346,7 @@ export const appRouter = router({
 
         if (!quotaCheck.allowed) {
           const resolvedPrefs = resolveMarketingTextPreferences(input.preferences || input.details.marketingPreferences);
-          const local = generateLocalMarketingText(input.details, resolvedPrefs, input.variant ?? 0);
+          const local = generateLocalMarketingText({ ...input.details, marketingText: '', marketingPreferences: undefined }, resolvedPrefs, input.variant ?? 0);
           await logAiUsage({
             userId: ctx.user.id,
             accessCodeId: quotaCheck.accessCodeId,
