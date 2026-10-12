@@ -4,12 +4,13 @@ import { getDb } from './db';
 
 export type AiQuotaCheckResult = {
   allowed: boolean;
-  reason?: 'daily_limit_exceeded' | 'credits_exhausted' | 'user_inactive';
+  reason?: 'daily_limit_exceeded' | 'credits_exhausted' | 'user_inactive' | 'db_unavailable';
   message?: string;
   isDeveloper?: boolean;
   accessCodeId?: number;
   remainingCredits?: number;
   dailyRemaining?: number;
+  dbUnavailable?: boolean;
 };
 
 export type AiUsageLogInput = {
@@ -22,90 +23,137 @@ export type AiUsageLogInput = {
   responseTimeMs?: number;
 };
 
-export async function checkAndDeductAiQuota(params: {
+/**
+ * المرحلة الأولى: فحص الحصة دون خصم
+ * يتحقق فقط من أهلية المستخدم ورصيده المتبقي والحد اليومي مع إعادة الضبط التلقائي بعد 24 ساعة.
+ * محمي تماماً بكتل try/catch حتى لا يتعطل التطبيق عند تعذر الاتصال بقاعدة البيانات.
+ */
+export async function checkAiQuota(params: {
   userId: number;
   feature: 'marketing_text' | 'connected_leader';
 }): Promise<AiQuotaCheckResult> {
-  const db = await getDb();
-  if (!db) return { allowed: true };
+  try {
+    const db = await getDb();
+    if (!db) {
+      return {
+        allowed: false,
+        dbUnavailable: true,
+        reason: 'db_unavailable',
+        message: 'قاعدة البيانات غير متاحة حالياً، جاري التحويل للصياغة المحلية.',
+      };
+    }
 
-  const user = (await db.select().from(users).where(eq(users.id, params.userId)).limit(1))[0];
-  if (!user) return { allowed: false, reason: 'user_inactive', message: 'المستخدم غير موجود' };
+    const user = (await db.select().from(users).where(eq(users.id, params.userId)).limit(1))[0];
+    if (!user) {
+      return { allowed: false, reason: 'user_inactive', message: 'المستخدم غير موجود' };
+    }
 
-  // استثناء حساب المطور / المشرف برصيد غير محدود
-  if (user.role === 'admin') {
-    return { allowed: true, isDeveloper: true, remainingCredits: -1, dailyRemaining: -1 };
-  }
+    // حساب المطور / المشرف يتمتع برصيد غير محدود
+    if (user.role === 'admin') {
+      return { allowed: true, isDeveloper: true, remainingCredits: -1, dailyRemaining: -1 };
+    }
 
-  // البحث عن كود الوصول المرتبط بالمستخدم
-  const code = (await db.select().from(accessCodes).where(eq(accessCodes.sessionOpenId, user.openId)).limit(1))[0];
-  if (!code) {
-    // حساب لا يرتبط بكود وصول محدد (افتراضي آمن ومسموح)
-    return { allowed: true, remainingCredits: -1, dailyRemaining: -1 };
-  }
+    // استعلام كود الوصول المرتبط بالمستخدم
+    const code = (await db.select().from(accessCodes).where(eq(accessCodes.sessionOpenId, user.openId)).limit(1))[0];
+    if (!code) {
+      // مستخدم بلا كود وصول مرتبط: مسموح افتراضياً
+      return { allowed: true, remainingCredits: -1, dailyRemaining: -1 };
+    }
 
-  const now = new Date();
-  const resetIntervalMs = 24 * 60 * 60 * 1000;
-  const timeSinceReset = now.getTime() - code.aiDailyResetAt.getTime();
-  let currentDailyUsed = code.aiDailyUsed;
+    const now = new Date();
+    const resetIntervalMs = 24 * 60 * 60 * 1000;
+    const timeSinceReset = now.getTime() - code.aiDailyResetAt.getTime();
+    let currentDailyUsed = code.aiDailyUsed;
 
-  // إعادة ضبط العداد اليومي تلقائياً عند مرور 24 ساعة
-  if (timeSinceReset >= resetIntervalMs) {
-    currentDailyUsed = 0;
-    await db.update(accessCodes)
-      .set({ aiDailyUsed: 0, aiDailyResetAt: now })
-      .where(eq(accessCodes.id, code.id));
-  }
+    // إعادة ضبط العداد اليومي تلقائياً عند انقضاء 24 ساعة
+    if (timeSinceReset >= resetIntervalMs) {
+      currentDailyUsed = 0;
+      await db.update(accessCodes)
+        .set({ aiDailyUsed: 0, aiDailyResetAt: now })
+        .where(eq(accessCodes.id, code.id));
+    }
 
-  // فحص الحد اليومي
-  if (code.aiDailyLimit !== -1 && currentDailyUsed >= code.aiDailyLimit) {
+    // فحص الحد اليومي
+    if (code.aiDailyLimit !== -1 && currentDailyUsed >= code.aiDailyLimit) {
+      const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
+      return {
+        allowed: false,
+        reason: 'daily_limit_exceeded',
+        message: `اكتمل الحد اليومي لاستخدام الذكاء الاصطناعي (${code.aiDailyLimit}/${code.aiDailyLimit})، وسيتجدد تلقائياً غداً.`,
+        accessCodeId: code.id,
+        remainingCredits,
+        dailyRemaining: 0,
+      };
+    }
+
+    // فحص إجمالي الرصيد السحابي المتاح
+    if (code.aiCreditsTotal !== -1 && code.aiCreditsUsed >= code.aiCreditsTotal) {
+      return {
+        allowed: false,
+        reason: 'credits_exhausted',
+        message: `نفد رصيد الذكاء الاصطناعي السحابي لهذا الرمز (${code.aiCreditsTotal}/${code.aiCreditsTotal}). يرجى طلب شحن الرصيد.`,
+        accessCodeId: code.id,
+        remainingCredits: 0,
+        dailyRemaining: Math.max(0, code.aiDailyLimit - currentDailyUsed),
+      };
+    }
+
     const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
+    const dailyRemaining = code.aiDailyLimit === -1 ? -1 : Math.max(0, code.aiDailyLimit - currentDailyUsed);
+
     return {
-      allowed: false,
-      reason: 'daily_limit_exceeded',
-      message: `اكتمل الحد اليومي لاستخدام الذكاء الاصطناعي (${code.aiDailyLimit}/${code.aiDailyLimit})، وسيتجدد تلقائياً غداً.`,
+      allowed: true,
       accessCodeId: code.id,
       remainingCredits,
-      dailyRemaining: 0,
+      dailyRemaining,
     };
-  }
-
-  // فحص إجمالي الرصيد المتاح
-  if (code.aiCreditsTotal !== -1 && code.aiCreditsUsed >= code.aiCreditsTotal) {
+  } catch (err) {
+    console.error('[AI Quota Gate] Database error during checkAiQuota:', err);
     return {
       allowed: false,
-      reason: 'credits_exhausted',
-      message: `نفد رصيد الذكاء الاصطناعي السحابي لهذا الرمز (${code.aiCreditsTotal}/${code.aiCreditsTotal}). يرجى طلب شحن الرصيد.`,
-      accessCodeId: code.id,
-      remainingCredits: 0,
-      dailyRemaining: Math.max(0, code.aiDailyLimit - currentDailyUsed),
+      dbUnavailable: true,
+      reason: 'db_unavailable',
+      message: 'تعذر الاتصال بقاعدة البيانات للتحقق من الرصيد، جاري التوليد المحلي.',
     };
   }
-
-  // خصم نقطة واحدة من العداد الإجمالي واليومي
-  await db.update(accessCodes)
-    .set({
-      aiCreditsUsed: sql`${accessCodes.aiCreditsUsed} + 1`,
-      aiDailyUsed: sql`${accessCodes.aiDailyUsed} + 1`,
-      lastUsedAt: now,
-    })
-    .where(eq(accessCodes.id, code.id));
-
-  const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - (code.aiCreditsUsed + 1));
-  const dailyRemaining = code.aiDailyLimit === -1 ? -1 : Math.max(0, code.aiDailyLimit - (currentDailyUsed + 1));
-
-  return {
-    allowed: true,
-    accessCodeId: code.id,
-    remainingCredits,
-    dailyRemaining,
-  };
 }
 
+/**
+ * المرحلة الثانية: الخصم الفعلي بعد نجاح التوليد السحابي
+ * لا تُستدعى إلا بعد تأكيد نجاح الاستجابة من الموديل السحابي (source === 'cloud').
+ */
+export async function deductAiQuota(params: {
+  accessCodeId?: number;
+  credits?: number;
+}): Promise<void> {
+  if (!params.accessCodeId) return;
+  const creditsToDeduct = params.credits ?? 1;
+  if (creditsToDeduct <= 0) return;
+
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    await db.update(accessCodes)
+      .set({
+        aiCreditsUsed: sql`${accessCodes.aiCreditsUsed} + ${creditsToDeduct}`,
+        aiDailyUsed: sql`${accessCodes.aiDailyUsed} + ${creditsToDeduct}`,
+        lastUsedAt: new Date(),
+      })
+      .where(eq(accessCodes.id, params.accessCodeId));
+  } catch (err) {
+    console.error('[AI Quota Gate] Failed to deduct quota:', err);
+  }
+}
+
+/**
+ * توثيق استهلاك وسجلات الذكاء الاصطناعي
+ */
 export async function logAiUsage(input: AiUsageLogInput): Promise<void> {
   try {
     const db = await getDb();
     if (!db) return;
+
     await db.insert(aiUsageLogs).values({
       userId: input.userId,
       accessCodeId: input.accessCodeId,
@@ -120,54 +168,71 @@ export async function logAiUsage(input: AiUsageLogInput): Promise<void> {
   }
 }
 
+/**
+ * استعلام حالة ورصيد المستخدم
+ */
 export async function getUserAiQuotaStatus(userId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
-  if (!user) return null;
+  try {
+    const db = await getDb();
+    if (!db) return null;
 
-  if (user.role === 'admin') {
+    const user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+    if (!user) return null;
+
+    if (user.role === 'admin') {
+      return {
+        isUnlimited: true,
+        creditsTotal: -1,
+        creditsUsed: 0,
+        creditsRemaining: -1,
+        dailyLimit: -1,
+        dailyUsed: 0,
+        dailyRemaining: -1,
+      };
+    }
+
+    const code = (await db.select().from(accessCodes).where(eq(accessCodes.sessionOpenId, user.openId)).limit(1))[0];
+    if (!code) {
+      return {
+        isUnlimited: true,
+        creditsTotal: -1,
+        creditsUsed: 0,
+        creditsRemaining: -1,
+        dailyLimit: -1,
+        dailyUsed: 0,
+        dailyRemaining: -1,
+      };
+    }
+
+    const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
+    const dailyRemaining = code.aiDailyLimit === -1 ? -1 : Math.max(0, code.aiDailyLimit - code.aiDailyUsed);
+
     return {
-      isUnlimited: true,
-      creditsTotal: -1,
-      creditsUsed: 0,
-      creditsRemaining: -1,
-      dailyLimit: -1,
-      dailyUsed: 0,
-      dailyRemaining: -1,
+      isUnlimited: code.aiCreditsTotal === -1 && code.aiDailyLimit === -1,
+      creditsTotal: code.aiCreditsTotal,
+      creditsUsed: code.aiCreditsUsed,
+      creditsRemaining: remainingCredits,
+      dailyLimit: code.aiDailyLimit,
+      dailyUsed: code.aiDailyUsed,
+      dailyRemaining,
+      dailyResetAt: code.aiDailyResetAt,
     };
+  } catch (err) {
+    console.error('[AI Quota Gate] Failed to fetch user quota status:', err);
+    return null;
   }
-
-  const code = (await db.select().from(accessCodes).where(eq(accessCodes.sessionOpenId, user.openId)).limit(1))[0];
-  if (!code) {
-    return {
-      isUnlimited: true,
-      creditsTotal: -1,
-      creditsUsed: 0,
-      creditsRemaining: -1,
-      dailyLimit: -1,
-      dailyUsed: 0,
-      dailyRemaining: -1,
-    };
-  }
-
-  const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
-  const dailyRemaining = code.aiDailyLimit === -1 ? -1 : Math.max(0, code.aiDailyLimit - code.aiDailyUsed);
-
-  return {
-    isUnlimited: code.aiCreditsTotal === -1 && code.aiDailyLimit === -1,
-    creditsTotal: code.aiCreditsTotal,
-    creditsUsed: code.aiCreditsUsed,
-    creditsRemaining: remainingCredits,
-    dailyLimit: code.aiDailyLimit,
-    dailyUsed: code.aiDailyUsed,
-    dailyRemaining,
-    dailyResetAt: code.aiDailyResetAt,
-  };
 }
 
+/**
+ * استعراض سجلات الاستهلاك للمطور
+ */
 export async function listAiUsageLogs(limit = 50) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(aiUsageLogs).orderBy(desc(aiUsageLogs.createdAt)).limit(limit);
+  try {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(aiUsageLogs).orderBy(desc(aiUsageLogs.createdAt)).limit(limit);
+  } catch (err) {
+    console.error('[AI Quota Gate] Failed to list usage logs:', err);
+    return [];
+  }
 }
