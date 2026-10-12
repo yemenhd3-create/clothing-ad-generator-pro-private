@@ -73,9 +73,29 @@ export const accessCodes = mysqlTable("access_codes", {
   maxUses: int("maxUses"),
   useCount: int("useCount").default(0).notNull(),
   isRevoked: int("isRevoked").default(0).notNull(),
+  aiCreditsTotal: int("aiCreditsTotal").default(100).notNull(),
+  aiCreditsUsed: int("aiCreditsUsed").default(0).notNull(),
+  aiDailyLimit: int("aiDailyLimit").default(20).notNull(),
+  aiDailyUsed: int("aiDailyUsed").default(0).notNull(),
+  aiDailyResetAt: timestamp("aiDailyResetAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   lastUsedAt: timestamp("lastUsedAt"),
 });
+
+export const aiUsageLogs = mysqlTable("ai_usage_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  accessCodeId: int("accessCodeId"),
+  feature: varchar("feature", { length: 64 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  model: varchar("model", { length: 120 }).notNull(),
+  status: varchar("status", { length: 32 }).notNull(),
+  responseTimeMs: int("responseTimeMs").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AiUsageLog = typeof aiUsageLogs.$inferSelect;
+export type InsertAiUsageLog = typeof aiUsageLogs.$inferInsert;
 
 export type AccessCode = typeof accessCodes.$inferSelect;
 

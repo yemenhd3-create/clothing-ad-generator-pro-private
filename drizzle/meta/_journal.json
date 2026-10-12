@@ -57,6 +57,13 @@
       "when": 1788632259000,
       "tag": "0007_restore_access_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788700000000,
+      "tag": "0008_add_ai_quotas_and_usage_logs",
+      "breakpoints": true
     }
   ]
 }
