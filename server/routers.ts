@@ -8,6 +8,7 @@ import { z } from "zod";
 import { authenticateDeveloper } from "./developerAuth";
 import { DEVELOPER_SESSION_COOKIE, DEVELOPER_SESSION_MAX_AGE_MS, isDeveloperSession, issueDeveloperSession } from './developerSession';
 import { checkDeveloperProvider, deleteDeveloperProvider, listDeveloperProviders, saveDeveloperProvider, verifyConnectedLeaderProvider } from './developerProviders';
+import { getActiveProviderCooldowns, resetProviderCooldown, clearAllProviderCooldowns } from './aiProviderErrors';
 import { inspectPrivateKeyBatch } from './privateKeyInspector';
 import { removeBackgroundFromProduct, runProductToModelTryOn } from './tryOn';
 import { generateMarketingTextWithFallback } from './marketingText';
@@ -92,6 +93,18 @@ export const appRouter = router({
       check: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => checkDeveloperProvider(input.id)),
       verifyLeader: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => verifyConnectedLeaderProvider(input.id)),
       remove: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => deleteDeveloperProvider(input.id)),
+      cooldowns: developerProcedure.query(() => getActiveProviderCooldowns()),
+      resetCooldown: developerProcedure
+        .input(z.object({ id: z.string().min(1) }))
+        .mutation(({ input }) => {
+          resetProviderCooldown(input.id);
+          return { success: true, id: input.id };
+        }),
+      clearAllCooldowns: developerProcedure
+        .mutation(() => {
+          clearAllProviderCooldowns();
+          return { success: true };
+        }),
     }),
     privateKeyChat: router({
       inspectBatch: developerProcedure

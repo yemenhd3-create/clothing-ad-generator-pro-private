@@ -163,3 +163,25 @@ export function resetProviderCooldown(providerId: string): void {
 export function clearAllProviderCooldowns(): void {
   providerCooldowns.clear();
 }
+
+export type ProviderCooldownStatus = {
+  inCooldown: boolean;
+  remainingMs: number;
+  until: number;
+};
+
+export function getActiveProviderCooldowns(now = Date.now()): Record<string, ProviderCooldownStatus> {
+  const result: Record<string, ProviderCooldownStatus> = {};
+  providerCooldowns.forEach((until, providerId) => {
+    if (now < until) {
+      result[providerId] = {
+        inCooldown: true,
+        remainingMs: Math.max(0, until - now),
+        until,
+      };
+    } else {
+      providerCooldowns.delete(providerId);
+    }
+  });
+  return result;
+}

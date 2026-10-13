@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   classifyProviderError,
   clearAllProviderCooldowns,
+  getActiveProviderCooldowns,
   isProviderInCooldown,
   markProviderCooldown,
   resetProviderCooldown,
@@ -98,6 +99,27 @@ describe('AI provider error classification & key rotation', () => {
       markProviderCooldown('test-provider', 30_000, now);
       resetProviderCooldown('test-provider');
       expect(isProviderInCooldown('test-provider', now + 10_000)).toBe(false);
+    });
+    it('returns active cooldowns via getActiveProviderCooldowns and cleans expired entries', () => {
+      const now = 2_000_000;
+      markProviderCooldown('prov-1', 20_000, now);
+      markProviderCooldown('prov-2', 50_000, now);
+
+      const active = getActiveProviderCooldowns(now + 10_000);
+      expect(active['prov-1']).toMatchObject({
+        inCooldown: true,
+        remainingMs: 10_000,
+        until: now + 20_000,
+      });
+      expect(active['prov-2']).toMatchObject({
+        inCooldown: true,
+        remainingMs: 40_000,
+        until: now + 50_000,
+      });
+
+      const later = getActiveProviderCooldowns(now + 25_000);
+      expect(later['prov-1']).toBeUndefined();
+      expect(later['prov-2']).toBeDefined();
     });
   });
 });
