@@ -227,7 +227,10 @@ export const appRouter = router({
   }),
   leader: router({
     connected: protectedProcedure
-      .input(z.object({ message: z.string().trim().min(1).max(1_200) }))
+      .input(z.object({
+        message: z.string().trim().min(1).max(1_200),
+        requestId: z.string().max(64).optional(),
+      }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
         const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'connected_leader' });
@@ -254,7 +257,7 @@ export const appRouter = router({
         const duration = Date.now() - startTime;
 
         if (reply.source !== 'local-fallback') {
-          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1 });
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
           await logAiUsage({
             userId: ctx.user.id,
             accessCodeId: quotaCheck.accessCodeId,
@@ -339,6 +342,7 @@ export const appRouter = router({
           emphasis: z.enum(['normal', 'bold', 'featured']),
         }),
         variant: z.number().int().min(0).max(20).optional(),
+        requestId: z.string().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
@@ -371,7 +375,7 @@ export const appRouter = router({
         const duration = Date.now() - startTime;
 
         if (result.source === 'cloud') {
-          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1 });
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
           await logAiUsage({
             userId: ctx.user.id,
             accessCodeId: quotaCheck.accessCodeId,

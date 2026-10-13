@@ -122,17 +122,96 @@ export async function checkAiQuota(params: {
  * المرحلة الثانية: الخصم الفعلي بعد نجاح التوليد السحابي
  * لا تُستدعى إلا بعد تأكيد نجاح الاستجابة من الموديل السحابي (source === 'cloud').
  */
+export interface IdempotencyRecord {
+  accessCodeId: number;
+  credits: number;
+  timestamp: number;
+}
+
+export const IDEMPOTENCY_TTL_MS = 15 * 60 * 1000;
+const idempotencyCache = new Map<string, IdempotencyRecord>();
+
+export function cleanupExpiredIdempotencyKeys(now = Date.now()): void {
+  for (const [key, record] of idempotencyCache.entries()) {
+    if (now - record.timestamp > IDEMPOTENCY_TTL_MS) {
+      idempotencyCache.delete(key);
+    }
+  }
+}
+
+export function clearIdempotencyCache(): void {
+  idempotencyCache.clear();
+}
+
+export function isIdempotencyKeyDeducted(requestId: string): boolean {
+  cleanupExpiredIdempotencyKeys();
+  return idempotencyCache.has(requestId.trim());
+}
+
+export function registerIdempotentRequest(requestId: string, accessCodeId: number, credits = 1, now = Date.now()): boolean {
+  cleanupExpiredIdempotencyKeys(now);
+  const trimmed = requestId.trim();
+  if (!trimmed) return true;
+  if (idempotencyCache.has(trimmed)) {
+    return false; // Duplicate!
+  }
+  idempotencyCache.set(trimmed, {
+    accessCodeId,
+    credits,
+    timestamp: now,
+  });
+  return true;
+}
+
+export type DeductAiQuotaResult = {
+  deducted: boolean;
+  duplicate: boolean;
+  creditsDeducted: number;
+};
+
+/**
+ * المرحلة الثانية والثالثة: الخصم الفعلي بعد نجاح التوليد السحابي
+ * تتضمن آلية Idempotency لمنع تكرار الخصم عند إعادة إرسال الطلب (requestId).
+ * لا تُستدعى إلا بعد تأكيد نجاح الاستجابة من الموديل السحابي.
+ */
 export async function deductAiQuota(params: {
   accessCodeId?: number;
   credits?: number;
-}): Promise<void> {
-  if (!params.accessCodeId) return;
+  requestId?: string;
+}): Promise<DeductAiQuotaResult> {
+  if (!params.accessCodeId) {
+    return { deducted: false, duplicate: false, creditsDeducted: 0 };
+  }
   const creditsToDeduct = params.credits ?? 1;
-  if (creditsToDeduct <= 0) return;
+  if (creditsToDeduct <= 0) {
+    return { deducted: false, duplicate: false, creditsDeducted: 0 };
+  }
+
+  // فحص معرّف الطلب لمنع الخصم المزدوج
+  const trimmedKey = params.requestId?.trim();
+  if (trimmedKey) {
+    cleanupExpiredIdempotencyKeys();
+    const existing = idempotencyCache.get(trimmedKey);
+    if (existing) {
+      // الطلب مكرر وسَبَق خصمه بنجاح لنفس العملية
+      return { deducted: false, duplicate: true, creditsDeducted: 0 };
+    }
+    // تسجيل المعرف لحماية العمليات المتزامنة
+    idempotencyCache.set(trimmedKey, {
+      accessCodeId: params.accessCodeId,
+      credits: creditsToDeduct,
+      timestamp: Date.now(),
+    });
+  }
 
   try {
     const db = await getDb();
-    if (!db) return;
+    if (!db) {
+      if (trimmedKey) {
+        idempotencyCache.delete(trimmedKey);
+      }
+      return { deducted: false, duplicate: false, creditsDeducted: 0 };
+    }
 
     await db.update(accessCodes)
       .set({
@@ -141,8 +220,14 @@ export async function deductAiQuota(params: {
         lastUsedAt: new Date(),
       })
       .where(eq(accessCodes.id, params.accessCodeId));
+
+    return { deducted: true, duplicate: false, creditsDeducted: creditsToDeduct };
   } catch (err) {
     console.error('[AI Quota Gate] Failed to deduct quota:', err);
+    if (trimmedKey) {
+      idempotencyCache.delete(trimmedKey);
+    }
+    return { deducted: false, duplicate: false, creditsDeducted: 0 };
   }
 }
 

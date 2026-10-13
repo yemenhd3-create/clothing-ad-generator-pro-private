@@ -98,4 +98,82 @@ describe('AI Quota Gate - Phase 2 Decoupled Logic & Resiliency', () => {
     const shouldUseLocal = !dbOutageResult.allowed;
     expect(shouldUseLocal).toBe(true);
   });
+
+  describe('Idempotency & Duplicate Request Protection', () => {
+    it('prevents duplicate deductions when the same requestId is resent', async () => {
+      const { clearIdempotencyCache, registerIdempotentRequest, isIdempotencyKeyDeducted, deductAiQuota } = await import('./aiQuotaGate');
+      clearIdempotencyCache();
+
+      const requestId = 'req-cag-uuid-101-abcd';
+      const accessCodeId = 42;
+
+      // First delivery: should be accepted and recorded
+      const firstAttempt = registerIdempotentRequest(requestId, accessCodeId, 1);
+      expect(firstAttempt).toBe(true);
+      expect(isIdempotencyKeyDeducted(requestId)).toBe(true);
+
+      // Second delivery (e.g. network retry / duplicate click): must be flagged as duplicate and rejected from double charging
+      const secondAttempt = registerIdempotentRequest(requestId, accessCodeId, 1);
+      expect(secondAttempt).toBe(false);
+
+      // Third delivery: still blocked
+      const thirdAttempt = registerIdempotentRequest(requestId, accessCodeId, 1);
+      expect(thirdAttempt).toBe(false);
+
+      // Direct deductAiQuota call with the same requestId flags duplicate
+      const directDuplicate = await deductAiQuota({ accessCodeId, credits: 1, requestId });
+      expect(directDuplicate.duplicate).toBe(true);
+      expect(directDuplicate.deducted).toBe(false);
+      expect(directDuplicate.creditsDeducted).toBe(0);
+    });
+
+    it('allows distinct requestIds for the same user or access code', async () => {
+      const { clearIdempotencyCache, registerIdempotentRequest } = await import('./aiQuotaGate');
+      clearIdempotencyCache();
+
+      const reqA = 'req-generation-1';
+      const reqB = 'req-generation-2';
+      const accessCodeId = 42;
+
+      expect(registerIdempotentRequest(reqA, accessCodeId, 1)).toBe(true);
+      expect(registerIdempotentRequest(reqB, accessCodeId, 1)).toBe(true);
+      // Retrying reqA again fails
+      expect(registerIdempotentRequest(reqA, accessCodeId, 1)).toBe(false);
+      // Retrying reqB again fails
+      expect(registerIdempotentRequest(reqB, accessCodeId, 1)).toBe(false);
+    });
+
+    it('handles requests with empty or omitted requestId gracefully', async () => {
+      const { clearIdempotencyCache, registerIdempotentRequest, deductAiQuota } = await import('./aiQuotaGate');
+      clearIdempotencyCache();
+
+      // Empty string requestId does not lock out subsequent requests
+      expect(registerIdempotentRequest('', 42, 1)).toBe(true);
+      expect(registerIdempotentRequest('   ', 42, 1)).toBe(true);
+
+      // Omitted accessCodeId safely returns non-duplicate zero deduction
+      const noCode = await deductAiQuota({ credits: 1 });
+      expect(noCode.deducted).toBe(false);
+      expect(noCode.duplicate).toBe(false);
+    });
+
+    it('expires idempotency keys after TTL threshold', async () => {
+      const { clearIdempotencyCache, registerIdempotentRequest, cleanupExpiredIdempotencyKeys, isIdempotencyKeyDeducted, IDEMPOTENCY_TTL_MS } = await import('./aiQuotaGate');
+      clearIdempotencyCache();
+
+      const requestId = 'req-ttl-test';
+      const t0 = 1000000;
+      registerIdempotentRequest(requestId, 42, 1, t0);
+
+      // Before TTL expiration: key is active
+      expect(isIdempotencyKeyDeducted(requestId)).toBe(true);
+
+      // After TTL: key is pruned
+      cleanupExpiredIdempotencyKeys(t0 + IDEMPOTENCY_TTL_MS + 1000);
+      expect(isIdempotencyKeyDeducted(requestId)).toBe(false);
+
+      // Can now register again if needed after TTL
+      expect(registerIdempotentRequest(requestId, 42, 1, t0 + IDEMPOTENCY_TTL_MS + 2000)).toBe(true);
+    });
+  });
 });
