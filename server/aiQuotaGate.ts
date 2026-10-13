@@ -132,11 +132,11 @@ export const IDEMPOTENCY_TTL_MS = 15 * 60 * 1000;
 const idempotencyCache = new Map<string, IdempotencyRecord>();
 
 export function cleanupExpiredIdempotencyKeys(now = Date.now()): void {
-  for (const [key, record] of idempotencyCache.entries()) {
+  idempotencyCache.forEach((record, key) => {
     if (now - record.timestamp > IDEMPOTENCY_TTL_MS) {
       idempotencyCache.delete(key);
     }
-  }
+  });
 }
 
 export function clearIdempotencyCache(): void {
