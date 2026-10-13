@@ -46,6 +46,8 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      // The Android app sends queries as POST (see client/src/main.tsx).
+      allowMethodOverride: true,
     })
   );
   // development mode uses Vite, production mode uses static files

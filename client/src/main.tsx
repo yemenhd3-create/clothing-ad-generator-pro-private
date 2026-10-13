@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { isNativeApp } from "@/lib/nativeApp";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -44,13 +45,7 @@ function getTrpcBaseUrl(): string {
   }
 
   // In Capacitor APK / mobile WebView or standalone local file
-  if (
-    typeof window !== "undefined" &&
-    (window.location.protocol === "capacitor:" ||
-      window.location.protocol === "ionic:" ||
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1")
-  ) {
+  if (isNativeApp()) {
     const remoteUrl = import.meta.env.VITE_API_URL || "https://production-v2-0-0.onrender.com";
     return `${remoteUrl.replace(/\/$/, "")}/api/trpc`;
   }
@@ -63,6 +58,10 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: getTrpcBaseUrl(),
       transformer: superjson,
+      // Inside the Android app, GET requests are routed by Capacitor through a
+      // WebView proxy that does not reliably forward our auth headers, so every
+      // request (queries included) is sent as POST through the native HTTP layer.
+      ...(isNativeApp() ? { methodOverride: "POST" as const } : {}),
       headers() {
         const headers: Record<string, string> = {};
 
