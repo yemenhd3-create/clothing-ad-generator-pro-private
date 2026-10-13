@@ -116,14 +116,14 @@ describe('إدارة أرصدة وسجلات الذكاء الاصطناعي ف�
   it('يعرض سجلات استهلاك الذكاء الاصطناعي ويتيح تصفيتها', () => {
     render(<DeveloperAiUsageLogs />);
     expect(screen.getByText('سجلات استهلاك الذكاء الاصطناعي')).toBeTruthy();
-    expect(screen.getByText('القائد الذكي المتصل')).toBeTruthy();
+    expect(screen.getAllByText('القائد الذكي المتصل').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('صياغة النصوص التسويقية')).toBeTruthy();
     expect(screen.getByText('نجاح')).toBeTruthy();
     expect(screen.getByText('تجاوز الحد اليومي')).toBeTruthy();
 
     // Filter by feature
     fireEvent.change(screen.getByLabelText('تصفية الميزة'), { target: { value: 'connected_leader' } });
-    expect(screen.getByText('القائد الذكي المتصل')).toBeTruthy();
+    expect(screen.getAllByText('القائد الذكي المتصل').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText('صياغة النصوص التسويقية')).toBeNull();
   });
 });

@@ -89,7 +89,6 @@ describe('developer provider tRPC routes', () => {
     expect(saveMock.mock.calls[0]?.[0]).not.toHaveProperty('apiKey');
     expect(saved.enabled).toBe(false);
   });
-})
 
   it('queries, resets single, and clears all provider cooldowns through tRPC routes', async () => {
     const caller = appRouter.createCaller(createContext());
