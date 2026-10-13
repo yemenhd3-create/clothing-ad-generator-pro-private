@@ -20,11 +20,13 @@ const COOLDOWN_30_SEC = 30 * 1000;
 const COOLDOWN_10_SEC = 10 * 1000;
 
 export function classifyProviderError(status?: number, errorBodyOrMessage?: unknown): ClassifiedProviderError {
-  const text = typeof errorBodyOrMessage === 'string'
-    ? errorBodyOrMessage.toLowerCase()
-    : typeof errorBodyOrMessage === 'object' && errorBodyOrMessage !== null
-      ? JSON.stringify(errorBodyOrMessage).toLowerCase()
-      : '';
+  const text = errorBodyOrMessage instanceof Error
+    ? `${errorBodyOrMessage.name} ${errorBodyOrMessage.message}`.toLowerCase()
+    : typeof errorBodyOrMessage === 'string'
+      ? errorBodyOrMessage.toLowerCase()
+      : typeof errorBodyOrMessage === 'object' && errorBodyOrMessage !== null
+        ? JSON.stringify(errorBodyOrMessage).toLowerCase()
+        : '';
 
   // 1. Quota / balance exhaustion
   if (
@@ -132,7 +134,11 @@ export function classifyProviderError(status?: number, errorBodyOrMessage?: unkn
   };
 }
 
-const providerCooldowns = new Map<string, number>();
+const GLOBAL_COOLDOWNS_KEY = Symbol.for('clogen.providerCooldowns');
+const providerCooldowns: Map<string, number> =
+  (globalThis as unknown as Record<symbol, Map<string, number>>)[GLOBAL_COOLDOWNS_KEY] ??
+  new Map<string, number>();
+(globalThis as unknown as Record<symbol, Map<string, number>>)[GLOBAL_COOLDOWNS_KEY] = providerCooldowns;
 
 export function markProviderCooldown(providerId: string, cooldownMs: number, now = Date.now()): void {
   if (!providerId || cooldownMs <= 0) return;
