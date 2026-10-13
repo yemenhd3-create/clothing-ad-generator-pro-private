@@ -162,15 +162,15 @@ describe('AI Quota Gate - Phase 2 Decoupled Logic & Resiliency', () => {
       clearIdempotencyCache();
 
       const requestId = 'req-ttl-test';
-      const t0 = 1000000;
+      const t0 = Date.now();
       registerIdempotentRequest(requestId, 42, 1, t0);
 
       // Before TTL expiration: key is active
-      expect(isIdempotencyKeyDeducted(requestId)).toBe(true);
+      expect(isIdempotencyKeyDeducted(requestId, t0)).toBe(true);
 
       // After TTL: key is pruned
       cleanupExpiredIdempotencyKeys(t0 + IDEMPOTENCY_TTL_MS + 1000);
-      expect(isIdempotencyKeyDeducted(requestId)).toBe(false);
+      expect(isIdempotencyKeyDeducted(requestId, t0 + IDEMPOTENCY_TTL_MS + 1000)).toBe(false);
 
       // Can now register again if needed after TTL
       expect(registerIdempotentRequest(requestId, 42, 1, t0 + IDEMPOTENCY_TTL_MS + 2000)).toBe(true);

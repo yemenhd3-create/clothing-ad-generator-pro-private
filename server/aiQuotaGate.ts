@@ -143,8 +143,8 @@ export function clearIdempotencyCache(): void {
   idempotencyCache.clear();
 }
 
-export function isIdempotencyKeyDeducted(requestId: string): boolean {
-  cleanupExpiredIdempotencyKeys();
+export function isIdempotencyKeyDeducted(requestId: string, now = Date.now()): boolean {
+  cleanupExpiredIdempotencyKeys(now);
   return idempotencyCache.has(requestId.trim());
 }
 
