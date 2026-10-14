@@ -10,6 +10,11 @@ export type AccessCodeSummary = {
   maxUses: number | null;
   useCount: number;
   isRevoked: boolean;
+  aiCreditsTotal: number;
+  aiCreditsUsed: number;
+  aiDailyLimit: number;
+  aiDailyUsed: number;
+  aiDailyResetAt: Date;
   createdAt: Date;
   lastUsedAt: Date | null;
 };
@@ -47,6 +52,11 @@ function summary(code: typeof accessCodes.$inferSelect): AccessCodeSummary {
     maxUses: code.maxUses,
     useCount: code.useCount,
     isRevoked: code.isRevoked === 1,
+    aiCreditsTotal: code.aiCreditsTotal,
+    aiCreditsUsed: code.aiCreditsUsed,
+    aiDailyLimit: code.aiDailyLimit,
+    aiDailyUsed: code.aiDailyUsed,
+    aiDailyResetAt: code.aiDailyResetAt,
     createdAt: code.createdAt,
     lastUsedAt: code.lastUsedAt,
   };
@@ -58,7 +68,13 @@ export async function listAccessCodes() {
   return codes.map(summary);
 }
 
-export async function createAccessCode(input: { label: string; expiresAt?: Date; maxUses?: number }) {
+export async function createAccessCode(input: {
+  label: string;
+  expiresAt?: Date;
+  maxUses?: number;
+  aiCreditsTotal?: number;
+  aiDailyLimit?: number;
+}) {
   const db = requireDb(await getDb());
   const rawCode = buildCode();
   const sessionOpenId = `access_${randomUUID().replace(/-/g, '')}`;
@@ -71,6 +87,10 @@ export async function createAccessCode(input: { label: string; expiresAt?: Date;
     label: input.label.trim(),
     expiresAt,
     maxUses: input.maxUses ?? null,
+    aiCreditsTotal: input.aiCreditsTotal ?? 100,
+    aiDailyLimit: input.aiDailyLimit ?? 20,
+    aiCreditsUsed: 0,
+    aiDailyUsed: 0,
   });
   const code = (await db.select().from(accessCodes).where(eq(accessCodes.id, Number(inserted[0].insertId))).limit(1))[0];
   if (!code) throw new Error('تعذر إنشاء رمز الوصول');
@@ -130,4 +150,38 @@ export async function redeemAccessCode(rawCode: string) {
     name: `وصول برمز: ${code.label}`,
     expiresAt: code.expiresAt,
   };
+}
+
+
+export async function rechargeAccessCodeCredits(id: number, addedCredits: number) {
+  const db = requireDb(await getDb());
+  const code = (await db.select().from(accessCodes).where(eq(accessCodes.id, id)).limit(1))[0];
+  if (!code) throw new Error('رمز الوصول غير موجود');
+  if (addedCredits <= 0) throw new Error('قيمة الشحن يجب أن تكون أكبر من الصفر');
+
+  const newTotal = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal + addedCredits);
+  await db.update(accessCodes).set({ aiCreditsTotal: newTotal }).where(eq(accessCodes.id, id));
+  return { success: true, aiCreditsTotal: newTotal };
+}
+
+export async function resetAccessCodeDailyLimit(id: number) {
+  const db = requireDb(await getDb());
+  const code = (await db.select().from(accessCodes).where(eq(accessCodes.id, id)).limit(1))[0];
+  if (!code) throw new Error('رمز الوصول غير موجود');
+
+  await db.update(accessCodes).set({ aiDailyUsed: 0, aiDailyResetAt: new Date() }).where(eq(accessCodes.id, id));
+  return { success: true, aiDailyUsed: 0 };
+}
+
+export async function updateAccessCodeAiLimits(id: number, input: { aiCreditsTotal?: number; aiDailyLimit?: number }) {
+  const db = requireDb(await getDb());
+  const code = (await db.select().from(accessCodes).where(eq(accessCodes.id, id)).limit(1))[0];
+  if (!code) throw new Error('رمز الوصول غير موجود');
+
+  const updates: Partial<typeof accessCodes.$inferInsert> = {};
+  if (typeof input.aiCreditsTotal === 'number') updates.aiCreditsTotal = input.aiCreditsTotal;
+  if (typeof input.aiDailyLimit === 'number') updates.aiDailyLimit = input.aiDailyLimit;
+
+  await db.update(accessCodes).set(updates).where(eq(accessCodes.id, id));
+  return { success: true };
 }

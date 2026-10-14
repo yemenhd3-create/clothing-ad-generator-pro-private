@@ -8,11 +8,17 @@ import { z } from "zod";
 import { authenticateDeveloper } from "./developerAuth";
 import { DEVELOPER_SESSION_COOKIE, DEVELOPER_SESSION_MAX_AGE_MS, isDeveloperSession, issueDeveloperSession } from './developerSession';
 import { checkDeveloperProvider, deleteDeveloperProvider, listDeveloperProviders, saveDeveloperProvider, verifyConnectedLeaderProvider } from './developerProviders';
+import { getActiveProviderCooldowns, resetProviderCooldown, clearAllProviderCooldowns } from './aiProviderErrors';
 import { inspectPrivateKeyBatch } from './privateKeyInspector';
 import { removeBackgroundFromProduct, runProductToModelTryOn } from './tryOn';
 import { generateMarketingTextWithFallback } from './marketingText';
+import { checkAiQuota, deductAiQuota, getUserAiQuotaStatus, listAiUsageLogs, logAiUsage } from './aiQuotaGate';
+import { generateLocalMarketingText, resolveMarketingTextPreferences } from '../shared/marketingText';
+import { parseMerchantCommands } from '@shared/merchantAssistant';
+import { resolveLocalLeaderPlan } from '@shared/localLeader';
+
 import { getConnectedLeaderReply } from './connectedLeader';
-import { createAccessCode, listAccessCodes, redeemAccessCode, revokeAccessCode } from './accessCodes';
+import { createAccessCode, listAccessCodes, redeemAccessCode, revokeAccessCode, rechargeAccessCodeCredits, resetAccessCodeDailyLimit, updateAccessCodeAiLimits } from './accessCodes';
 import { getUserByOpenId } from './db';
 import { sdk } from './_core/sdk';
 import {
@@ -87,6 +93,18 @@ export const appRouter = router({
       check: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => checkDeveloperProvider(input.id)),
       verifyLeader: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => verifyConnectedLeaderProvider(input.id)),
       remove: developerProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ input }) => deleteDeveloperProvider(input.id)),
+      cooldowns: developerProcedure.query(() => getActiveProviderCooldowns()),
+      resetCooldown: developerProcedure
+        .input(z.object({ id: z.string().min(1) }))
+        .mutation(({ input }) => {
+          resetProviderCooldown(input.id);
+          return { success: true, id: input.id };
+        }),
+      clearAllCooldowns: developerProcedure
+        .mutation(() => {
+          clearAllProviderCooldowns();
+          return { success: true };
+        }),
     }),
     privateKeyChat: router({
       inspectBatch: developerProcedure
@@ -116,6 +134,24 @@ export const appRouter = router({
       setOfflineGraceHours: developerProcedure
         .input(z.object({ hours: z.number().int().min(0).max(720) }))
         .mutation(({ input }) => setProjectOfflineGraceHours(input.hours)),
+      aiQuota: router({
+        recharge: developerProcedure
+          .input(z.object({ id: z.number().int().positive(), credits: z.number().int().positive() }))
+          .mutation(({ input }) => rechargeAccessCodeCredits(input.id, input.credits)),
+        resetDaily: developerProcedure
+          .input(z.object({ id: z.number().int().positive() }))
+          .mutation(({ input }) => resetAccessCodeDailyLimit(input.id)),
+        updateLimits: developerProcedure
+          .input(z.object({
+            id: z.number().int().positive(),
+            aiCreditsTotal: z.number().int().optional(),
+            aiDailyLimit: z.number().int().optional(),
+          }))
+          .mutation(({ input }) => updateAccessCodeAiLimits(input.id, input)),
+        logs: developerProcedure
+          .input(z.object({ limit: z.number().int().positive().max(200).optional() }))
+          .query(({ input }) => listAiUsageLogs(input.limit)),
+      }),
       accessCodes: router({
         list: developerProcedure.query(() => listAccessCodes()),
         create: developerProcedure
@@ -187,6 +223,10 @@ export const appRouter = router({
         const offlineLeaseToken = await createOfflineLeaseToken(ctx.user.id, settings.offlineGraceHours);
         return { ...presence, offlineLeaseToken };
       }),
+    aiQuota: protectedProcedure.query(async ({ ctx }) => {
+      await assertPersonalUserIsActive(ctx.user.id);
+      return getUserAiQuotaStatus(ctx.user.id);
+    }),
     announcement: protectedProcedure.query(async ({ ctx }) => {
       await assertPersonalUserIsActive(ctx.user.id);
       return getActiveAnnouncement();
@@ -200,10 +240,59 @@ export const appRouter = router({
   }),
   leader: router({
     connected: protectedProcedure
-      .input(z.object({ message: z.string().trim().min(1).max(1_200) }))
+      .input(z.object({
+        message: z.string().trim().min(1).max(1_200),
+        requestId: z.string().max(64).optional(),
+      }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        return getConnectedLeaderReply(input.message);
+        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'connected_leader' });
+
+        if (!quotaCheck.allowed) {
+          const local = resolveLocalLeaderPlan(input.message, parseMerchantCommands(input.message));
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'connected_leader',
+            provider: 'local',
+            model: 'local-leader',
+            status: quotaCheck.reason === 'daily_limit_exceeded' || quotaCheck.reason === 'credits_exhausted' ? 'quota_exceeded' : 'fallback_local',
+          });
+          return {
+            reply: quotaCheck.message ? `${quotaCheck.message} (القائد المحلي: ${local.reply})` : `تعذر الوصول إلى القائد المتصل، القائد المحلي: ${local.reply}`,
+            source: 'local-fallback' as const,
+            usedFallback: true,
+          };
+        }
+
+        const startTime = Date.now();
+        const reply = await getConnectedLeaderReply(input.message);
+        const duration = Date.now() - startTime;
+
+        if (reply.source !== 'local-fallback') {
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'connected_leader',
+            provider: reply.source,
+            model: reply.source,
+            status: 'success',
+            responseTimeMs: duration,
+          });
+        } else {
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'connected_leader',
+            provider: 'local',
+            model: 'local-leader',
+            status: 'fallback_local',
+            responseTimeMs: duration,
+          });
+        }
+
+        return reply;
       }),
   }),
   tryOn: router({
@@ -266,14 +355,62 @@ export const appRouter = router({
           emphasis: z.enum(['normal', 'bold', 'featured']),
         }),
         variant: z.number().int().min(0).max(20).optional(),
+        requestId: z.string().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        return generateMarketingTextWithFallback(
+        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'marketing_text' });
+
+        if (!quotaCheck.allowed) {
+          const resolvedPrefs = resolveMarketingTextPreferences(input.preferences || input.details.marketingPreferences);
+          const local = generateLocalMarketingText({ ...input.details, marketingText: '', marketingPreferences: undefined }, resolvedPrefs, input.variant ?? 0);
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'marketing_text',
+            provider: 'local',
+            model: 'local-template',
+            status: quotaCheck.reason === 'daily_limit_exceeded' || quotaCheck.reason === 'credits_exhausted' ? 'quota_exceeded' : 'fallback_local',
+          });
+          return {
+            text: local.text,
+            source: 'local-fallback' as const,
+            message: quotaCheck.message || 'تم استخدام الصياغة المحلية لعدم توفر الرصيد السحابي.',
+          };
+        }
+
+        const startTime = Date.now();
+        const result = await generateMarketingTextWithFallback(
           { ...input.details, marketingText: '', marketingPreferences: undefined },
           input.preferences,
           input.variant
         );
+        const duration = Date.now() - startTime;
+
+        if (result.source === 'cloud') {
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'marketing_text',
+            provider: result.provider || 'cloud',
+            model: result.provider || 'cloud',
+            status: 'success',
+            responseTimeMs: duration,
+          });
+        } else {
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'marketing_text',
+            provider: 'local',
+            model: 'local-template',
+            status: 'fallback_local',
+            responseTimeMs: duration,
+          });
+        }
+
+        return result;
       }),
   }),
 

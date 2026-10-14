@@ -1,3 +1,4 @@
+import { classifyProviderError, resetProviderCooldown } from './aiProviderErrors';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { desc, eq } from 'drizzle-orm';
 import { developerProviders } from '../drizzle/schema';
@@ -35,9 +36,16 @@ export type ConnectedLeaderProviderVerification = {
 };
 
 export function connectedLeaderVerificationFailure(presetLabel: string, status: number): ConnectedLeaderProviderVerification {
-  if (status === 402) return { verified: false, status: 402, message: `وصل ${presetLabel} لكن الحصة أو الرصيد غير متاح حالياً. سيستمر القائد المحلي.` };
-  if (status === 429) return { verified: false, status: 429, message: `وصل ${presetLabel} لكنه يطبق حد الطلبات حالياً. لم يُرفض المفتاح؛ انتظر قليلاً ثم أعد التحقق.` };
-  if (status === 401 || status === 403) return { verified: false, status, message: `رفض ${presetLabel} المفتاح أو الصلاحية. راجع المفتاح في حساب المزود.` };
+  const classified = classifyProviderError(status);
+  if (classified.kind === 'QUOTA_EXHAUSTED') {
+    return { verified: false, status: 402, message: `وصل ${presetLabel} لكن الحصة أو الرصيد غير متاح حالياً. سيستمر القائد المحلي.` };
+  }
+  if (classified.kind === 'RATE_LIMIT') {
+    return { verified: false, status: 429, message: `وصل ${presetLabel} لكنه يطبق حد الطلبات حالياً. لم يُرفض المفتاح؛ انتظر قليلاً ثم أعد التحقق.` };
+  }
+  if (classified.kind === 'INVALID_KEY') {
+    return { verified: false, status, message: `رفض ${presetLabel} المفتاح أو الصلاحية. راجع المفتاح في حساب المزود.` };
+  }
   return { verified: false, status, message: `تعذر اعتماد ${presetLabel} بسبب استجابة الخدمة.` };
 }
 
@@ -165,9 +173,11 @@ export async function verifyConnectedLeaderProvider(id: string): Promise<Connect
     if (response.ok) {
       const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       const hasText = Boolean(body.choices?.[0]?.message?.content?.trim());
-      return hasText
-        ? { verified: true, status: response.status, message: `نجح رد نصي قصير من ${preset.label}. المفتاح والمسار جاهزان للقائد المتصل.` }
-        : { verified: false, status: response.status, message: `استجاب ${preset.label} دون نص صالح؛ لم نعتمد المزود.` };
+      if (hasText) {
+        resetProviderCooldown(`${preset.id}:${preset.model.split(':').at(-1)}`);
+        return { verified: true, status: response.status, message: `نجح رد نصي قصير من ${preset.label}. المفتاح والمسار جاهزان للقائد المتصل.` };
+      }
+      return { verified: false, status: response.status, message: `استجاب ${preset.label} دون نص صالح؛ لم نعتمد المزود.` };
     }
     return connectedLeaderVerificationFailure(preset.label, response.status);
   } catch {
