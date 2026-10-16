@@ -32,10 +32,23 @@ export function normalizeAccessCode(code: string) {
   return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-export function getAccessCodeEligibility(input: { isRevoked: number; expiresAt: Date | null; maxUses: number | null; useCount: number }, now = new Date()) {
+export function getAccessCodeEligibility(
+  input: {
+    isRevoked: number;
+    expiresAt: Date | null;
+    maxUses: number | null;
+    useCount: number;
+    aiCreditsTotal?: number;
+    aiCreditsUsed?: number;
+  },
+  now = new Date()
+) {
   if (input.isRevoked === 1) return { eligible: false, reason: 'revoked' as const };
   if (input.expiresAt && input.expiresAt.getTime() <= now.getTime()) return { eligible: false, reason: 'expired' as const };
   if (input.maxUses !== null && input.useCount >= input.maxUses) return { eligible: false, reason: 'exhausted' as const };
+  if (typeof input.aiCreditsTotal === 'number' && input.aiCreditsTotal !== -1 && typeof input.aiCreditsUsed === 'number' && input.aiCreditsUsed >= input.aiCreditsTotal) {
+    return { eligible: false, reason: 'credits_exhausted' as const };
+  }
   return { eligible: true, reason: null } as const;
 }
 
@@ -87,8 +100,8 @@ export async function createAccessCode(input: {
     label: input.label.trim(),
     expiresAt,
     maxUses: input.maxUses ?? null,
-    aiCreditsTotal: input.aiCreditsTotal ?? 100,
-    aiDailyLimit: input.aiDailyLimit ?? 20,
+    aiCreditsTotal: input.aiCreditsTotal ?? 500,
+    aiDailyLimit: input.aiDailyLimit ?? 50,
     aiCreditsUsed: 0,
     aiDailyUsed: 0,
   });
@@ -120,6 +133,7 @@ export async function redeemAccessCode(rawCode: string) {
       revoked: 'رمز الدخول غير صحيح أو تم إلغاؤه',
       expired: 'انتهت صلاحية رمز الدخول',
       exhausted: 'اكتمل عدد استخدامات رمز الدخول',
+      credits_exhausted: 'نفد رصيد الكريدت المخصص لهذا الرمز بالكامل',
     } as const;
     throw new Error(messages[eligibility.reason]);
   }
