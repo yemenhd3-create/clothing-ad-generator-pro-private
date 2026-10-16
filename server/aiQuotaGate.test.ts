@@ -176,4 +176,53 @@ describe('AI Quota Gate - Phase 2 Decoupled Logic & Resiliency', () => {
       expect(registerIdempotentRequest(requestId, 42, 1, t0 + IDEMPOTENCY_TTL_MS + 2000)).toBe(true);
     });
   });
+
+  describe('Detailed Credit Wallet & Feature Pricing', () => {
+    it('defines distinct costs per feature operation', async () => {
+      const { AI_FEATURE_COSTS } = await import('./aiQuotaGate');
+      expect(AI_FEATURE_COSTS.try_on).toBe(10);
+      expect(AI_FEATURE_COSTS.remove_background).toBe(5);
+      expect(AI_FEATURE_COSTS.marketing_text).toBe(2);
+      expect(AI_FEATURE_COSTS.connected_leader).toBe(2);
+    });
+
+    it('identifies credits_exhausted when used credits reach or exceed total', () => {
+      const codeExhausted = {
+        isRevoked: 0,
+        expiresAt: null,
+        maxUses: null,
+        useCount: 5,
+        aiCreditsTotal: 500,
+        aiCreditsUsed: 500,
+      };
+      const res = getAccessCodeEligibility(codeExhausted);
+      expect(res.eligible).toBe(false);
+      expect(res.reason).toBe('credits_exhausted');
+
+      const codeActive = {
+        isRevoked: 0,
+        expiresAt: null,
+        maxUses: null,
+        useCount: 5,
+        aiCreditsTotal: 500,
+        aiCreditsUsed: 490,
+      };
+      const resActive = getAccessCodeEligibility(codeActive);
+      expect(resActive.eligible).toBe(true);
+      expect(resActive.reason).toBe(null);
+    });
+
+    it('correctly tracks credit deductions for multi-credit operations', async () => {
+      const { clearIdempotencyCache, registerIdempotentRequest } = await import('./aiQuotaGate');
+      clearIdempotencyCache();
+
+      const requestId = 'req-tryon-multi-credit';
+      const registered = registerIdempotentRequest(requestId, 101, 10);
+      expect(registered).toBe(true);
+
+      // Re-registering the same requestId for try-on is blocked
+      const duplicate = registerIdempotentRequest(requestId, 101, 10);
+      expect(duplicate).toBe(false);
+    });
+  });
 });

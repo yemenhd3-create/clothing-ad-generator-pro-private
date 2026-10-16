@@ -12,7 +12,7 @@ import { getActiveProviderCooldowns, resetProviderCooldown, clearAllProviderCool
 import { inspectPrivateKeyBatch } from './privateKeyInspector';
 import { removeBackgroundFromProduct, runProductToModelTryOn } from './tryOn';
 import { generateMarketingTextWithFallback } from './marketingText';
-import { checkAiQuota, deductAiQuota, getUserAiQuotaStatus, listAiUsageLogs, logAiUsage } from './aiQuotaGate';
+import { checkAiQuota, deductAiQuota, getUserAiQuotaStatus, listAiUsageLogs, logAiUsage, AI_FEATURE_COSTS } from './aiQuotaGate';
 import { generateLocalMarketingText, resolveMarketingTextPreferences } from '../shared/marketingText';
 import { parseMerchantCommands } from '@shared/merchantAssistant';
 import { resolveLocalLeaderPlan } from '@shared/localLeader';
@@ -159,11 +159,15 @@ export const appRouter = router({
             label: z.string().trim().min(1).max(120),
             expiresAt: z.number().int().positive().optional(),
             maxUses: z.number().int().positive().max(1_000_000).optional(),
+            aiCreditsTotal: z.number().int().min(-1).max(1_000_000).optional(),
+            aiDailyLimit: z.number().int().min(-1).max(100_000).optional(),
           }))
           .mutation(({ input }) => createAccessCode({
             label: input.label,
             expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
             maxUses: input.maxUses,
+            aiCreditsTotal: input.aiCreditsTotal,
+            aiDailyLimit: input.aiDailyLimit,
           })),
         revoke: developerProcedure
           .input(z.object({ id: z.number().int().positive() }))
@@ -246,7 +250,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'connected_leader' });
+        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'connected_leader', cost: AI_FEATURE_COSTS.connected_leader });
 
         if (!quotaCheck.allowed) {
           const local = resolveLocalLeaderPlan(input.message, parseMerchantCommands(input.message));
@@ -270,7 +274,7 @@ export const appRouter = router({
         const duration = Date.now() - startTime;
 
         if (reply.source !== 'local-fallback') {
-          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: AI_FEATURE_COSTS.connected_leader, requestId: input.requestId });
           await logAiUsage({
             userId: ctx.user.id,
             accessCodeId: quotaCheck.accessCodeId,
@@ -304,19 +308,105 @@ export const appRouter = router({
         pose: z.enum(['studio-standing', 'lifestyle-standing']),
         consent: z.literal(true),
         consentVersion: z.literal('tryon-v1'),
+        requestId: z.string().max(64).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        return runProductToModelTryOn(input.productImageData, input.aspectRatio, undefined, {
+        const quotaCheck = await checkAiQuota({
+          userId: ctx.user.id,
+          feature: 'try_on',
+          cost: AI_FEATURE_COSTS.try_on,
+        });
+
+        if (!quotaCheck.allowed) {
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'try_on',
+            provider: 'cloud',
+            model: 'try-on-v1',
+            status: 'quota_exceeded',
+          });
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: quotaCheck.message || 'رصيد الذكاء الاصطناعي غير كافٍ لتوليد صورة الإعلان (يتطلب 10 كريدت).',
+          });
+        }
+
+        const startTime = Date.now();
+        const result = await runProductToModelTryOn(input.productImageData, input.aspectRatio, undefined, {
           presentation: input.presentation,
           pose: input.pose,
         });
+        const duration = Date.now() - startTime;
+
+        await deductAiQuota({
+          accessCodeId: quotaCheck.accessCodeId,
+          credits: AI_FEATURE_COSTS.try_on,
+          requestId: input.requestId,
+        });
+
+        await logAiUsage({
+          userId: ctx.user.id,
+          accessCodeId: quotaCheck.accessCodeId,
+          feature: 'try_on',
+          provider: 'cloud',
+          model: 'try-on-v1',
+          status: 'success',
+          responseTimeMs: duration,
+        });
+
+        return result;
       }),
     removeBackground: protectedProcedure
-      .input(z.object({ productImageData: z.string().startsWith('data:image/').max(12_000_000) }))
+      .input(z.object({
+        productImageData: z.string().startsWith('data:image/').max(12_000_000),
+        requestId: z.string().max(64).optional(),
+      }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        return removeBackgroundFromProduct(input.productImageData);
+        const quotaCheck = await checkAiQuota({
+          userId: ctx.user.id,
+          feature: 'remove_background',
+          cost: AI_FEATURE_COSTS.remove_background,
+        });
+
+        if (!quotaCheck.allowed) {
+          await logAiUsage({
+            userId: ctx.user.id,
+            accessCodeId: quotaCheck.accessCodeId,
+            feature: 'remove_background',
+            provider: 'cloud',
+            model: 'bg-remove-v1',
+            status: 'quota_exceeded',
+          });
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: quotaCheck.message || 'رصيد الذكاء الاصطناعي غير كافٍ لمعالجة الصورة (يتطلب 5 كريدت).',
+          });
+        }
+
+        const startTime = Date.now();
+        const result = await removeBackgroundFromProduct(input.productImageData);
+        const duration = Date.now() - startTime;
+
+        await deductAiQuota({
+          accessCodeId: quotaCheck.accessCodeId,
+          credits: AI_FEATURE_COSTS.remove_background,
+          requestId: input.requestId,
+        });
+
+        await logAiUsage({
+          userId: ctx.user.id,
+          accessCodeId: quotaCheck.accessCodeId,
+          feature: 'remove_background',
+          provider: 'cloud',
+          model: 'bg-remove-v1',
+          status: 'success',
+          responseTimeMs: duration,
+        });
+
+        return result;
       }),
   }),
 
@@ -359,7 +449,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         await assertPersonalUserIsActive(ctx.user.id);
-        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'marketing_text' });
+        const quotaCheck = await checkAiQuota({ userId: ctx.user.id, feature: 'marketing_text', cost: AI_FEATURE_COSTS.marketing_text });
 
         if (!quotaCheck.allowed) {
           const resolvedPrefs = resolveMarketingTextPreferences(input.preferences || input.details.marketingPreferences);
@@ -388,7 +478,7 @@ export const appRouter = router({
         const duration = Date.now() - startTime;
 
         if (result.source === 'cloud') {
-          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: 1, requestId: input.requestId });
+          await deductAiQuota({ accessCodeId: quotaCheck.accessCodeId, credits: AI_FEATURE_COSTS.marketing_text, requestId: input.requestId });
           await logAiUsage({
             userId: ctx.user.id,
             accessCodeId: quotaCheck.accessCodeId,

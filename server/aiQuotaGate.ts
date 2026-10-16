@@ -2,8 +2,21 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { accessCodes, aiUsageLogs, users } from '../drizzle/schema';
 import { getDb } from './db';
 
+/**
+ * جدول التكلفة التفصيلي لكل عملية ذكاء اصطناعي (بالكريدت)
+ */
+export const AI_FEATURE_COSTS = {
+  marketing_text: 2,
+  connected_leader: 2,
+  try_on: 10,
+  remove_background: 5,
+} as const;
+
+export type AiFeatureType = keyof typeof AI_FEATURE_COSTS;
+
 export type AiQuotaCheckResult = {
   allowed: boolean;
+  cost?: number;
   reason?: 'daily_limit_exceeded' | 'credits_exhausted' | 'user_inactive' | 'db_unavailable';
   message?: string;
   isDeveloper?: boolean;
@@ -16,7 +29,7 @@ export type AiQuotaCheckResult = {
 export type AiUsageLogInput = {
   userId?: number;
   accessCodeId?: number;
-  feature: 'marketing_text' | 'connected_leader';
+  feature: AiFeatureType | 'marketing_text' | 'connected_leader' | 'try_on' | 'remove_background';
   provider: string;
   model: string;
   status: 'success' | 'quota_exceeded' | 'fallback_local' | 'error';
@@ -30,13 +43,17 @@ export type AiUsageLogInput = {
  */
 export async function checkAiQuota(params: {
   userId: number;
-  feature: 'marketing_text' | 'connected_leader';
+  feature: AiFeatureType;
+  cost?: number;
 }): Promise<AiQuotaCheckResult> {
+  const cost = params.cost ?? AI_FEATURE_COSTS[params.feature] ?? 1;
+
   try {
     const db = await getDb();
     if (!db) {
       return {
         allowed: false,
+        cost,
         dbUnavailable: true,
         reason: 'db_unavailable',
         message: 'قاعدة البيانات غير متاحة حالياً، جاري التحويل للصياغة المحلية.',
@@ -45,19 +62,19 @@ export async function checkAiQuota(params: {
 
     const user = (await db.select().from(users).where(eq(users.id, params.userId)).limit(1))[0];
     if (!user) {
-      return { allowed: false, reason: 'user_inactive', message: 'المستخدم غير موجود' };
+      return { allowed: false, cost, reason: 'user_inactive', message: 'المستخدم غير موجود' };
     }
 
     // حساب المطور / المشرف يتمتع برصيد غير محدود
     if (user.role === 'admin') {
-      return { allowed: true, isDeveloper: true, remainingCredits: -1, dailyRemaining: -1 };
+      return { allowed: true, cost, isDeveloper: true, remainingCredits: -1, dailyRemaining: -1 };
     }
 
     // استعلام كود الوصول المرتبط بالمستخدم
     const code = (await db.select().from(accessCodes).where(eq(accessCodes.sessionOpenId, user.openId)).limit(1))[0];
     if (!code) {
       // مستخدم بلا كود وصول مرتبط: مسموح افتراضياً
-      return { allowed: true, remainingCredits: -1, dailyRemaining: -1 };
+      return { allowed: true, cost, remainingCredits: -1, dailyRemaining: -1 };
     }
 
     const now = new Date();
@@ -73,36 +90,38 @@ export async function checkAiQuota(params: {
         .where(eq(accessCodes.id, code.id));
     }
 
-    // فحص الحد اليومي
-    if (code.aiDailyLimit !== -1 && currentDailyUsed >= code.aiDailyLimit) {
-      const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
-      return {
-        allowed: false,
-        reason: 'daily_limit_exceeded',
-        message: `اكتمل الحد اليومي لاستخدام الذكاء الاصطناعي (${code.aiDailyLimit}/${code.aiDailyLimit})، وسيتجدد تلقائياً غداً.`,
-        accessCodeId: code.id,
-        remainingCredits,
-        dailyRemaining: 0,
-      };
-    }
-
-    // فحص إجمالي الرصيد السحابي المتاح
-    if (code.aiCreditsTotal !== -1 && code.aiCreditsUsed >= code.aiCreditsTotal) {
-      return {
-        allowed: false,
-        reason: 'credits_exhausted',
-        message: `نفد رصيد الذكاء الاصطناعي السحابي لهذا الرمز (${code.aiCreditsTotal}/${code.aiCreditsTotal}). يرجى طلب شحن الرصيد.`,
-        accessCodeId: code.id,
-        remainingCredits: 0,
-        dailyRemaining: Math.max(0, code.aiDailyLimit - currentDailyUsed),
-      };
-    }
-
     const remainingCredits = code.aiCreditsTotal === -1 ? -1 : Math.max(0, code.aiCreditsTotal - code.aiCreditsUsed);
     const dailyRemaining = code.aiDailyLimit === -1 ? -1 : Math.max(0, code.aiDailyLimit - currentDailyUsed);
 
+    // فحص الحد اليومي مع الأخذ بالحسبان تكلفة العملية
+    if (code.aiDailyLimit !== -1 && (currentDailyUsed + cost > code.aiDailyLimit)) {
+      return {
+        allowed: false,
+        cost,
+        reason: 'daily_limit_exceeded',
+        message: `الحد اليومي المتبقي (${dailyRemaining} كريدت) لا يكفي لتكلفة هذه العملية (${cost} كريدت). سيتجدد الحد اليومي تلقائياً غداً.`,
+        accessCodeId: code.id,
+        remainingCredits,
+        dailyRemaining,
+      };
+    }
+
+    // فحص إجمالي الرصيد السحابي المتاح مع الأخذ بالحسبان تكلفة العملية
+    if (code.aiCreditsTotal !== -1 && (remainingCredits < cost)) {
+      return {
+        allowed: false,
+        cost,
+        reason: 'credits_exhausted',
+        message: `رصيد الكريدت غير كافٍ لهذه العملية (المطلوب: ${cost} كريدت، المتبقي: ${remainingCredits}). يرجى شحن الرصيد للمتابعة.`,
+        accessCodeId: code.id,
+        remainingCredits,
+        dailyRemaining,
+      };
+    }
+
     return {
       allowed: true,
+      cost,
       accessCodeId: code.id,
       remainingCredits,
       dailyRemaining,
@@ -111,6 +130,7 @@ export async function checkAiQuota(params: {
     console.error('[AI Quota Gate] Database error during checkAiQuota:', err);
     return {
       allowed: false,
+      cost,
       dbUnavailable: true,
       reason: 'db_unavailable',
       message: 'تعذر الاتصال بقاعدة البيانات للتحقق من الرصيد، جاري التوليد المحلي.',
