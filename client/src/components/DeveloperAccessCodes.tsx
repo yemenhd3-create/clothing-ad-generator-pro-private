@@ -271,23 +271,49 @@ export default function DeveloperAccessCodes() {
                 {isEditing && (
                   <div className="mt-3 rounded-xl bg-secondary/50 p-3 space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-bold text-primary">شحن رصيد إضافي:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={rechargeAmount}
-                        onChange={e => setRechargeAmount(e.target.value)}
-                        placeholder="عدد الكريدت"
-                        className="w-28 rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-bold text-foreground outline-none focus:border-primary"
-                      />
+                      <span className="text-xs font-bold text-primary">شحن رصيد سريع:</span>
                       <button
                         type="button"
                         disabled={rechargeMutation.isPending}
-                        onClick={() => handleRecharge(code.id)}
-                        className="rounded-lg bg-primary px-3 py-1 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+                        onClick={() => rechargeMutation.mutate({ id: code.id, credits: 20 })}
+                        className="rounded-md bg-white px-2 py-1 text-xs font-bold text-primary shadow-sm hover:bg-primary hover:text-white"
                       >
-                        {rechargeMutation.isPending ? 'جارٍ الشحن…' : 'شحن الرصيد'}
+                        +20
                       </button>
+                      <button
+                        type="button"
+                        disabled={rechargeMutation.isPending}
+                        onClick={() => rechargeMutation.mutate({ id: code.id, credits: 50 })}
+                        className="rounded-md bg-white px-2 py-1 text-xs font-bold text-primary shadow-sm hover:bg-primary hover:text-white"
+                      >
+                        +50
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rechargeMutation.isPending}
+                        onClick={() => rechargeMutation.mutate({ id: code.id, credits: 100 })}
+                        className="rounded-md bg-white px-2 py-1 text-xs font-bold text-primary shadow-sm hover:bg-primary hover:text-white"
+                      >
+                        +100
+                      </button>
+                      <div className="flex items-center gap-1 mr-auto">
+                        <input
+                          type="number"
+                          min="1"
+                          value={rechargeAmount}
+                          onChange={e => setRechargeAmount(e.target.value)}
+                          placeholder="قيمة مخصصة"
+                          className="h-8 w-24 rounded-md border border-stone-200 bg-white px-2 text-center text-xs font-bold outline-none focus:border-primary"
+                        />
+                        <button
+                          type="button"
+                          disabled={rechargeMutation.isPending}
+                          onClick={() => handleRecharge(code.id)}
+                          className="h-8 rounded-md bg-primary px-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+                        >
+                          شحن
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 border-t border-stone-200/50 pt-2">
