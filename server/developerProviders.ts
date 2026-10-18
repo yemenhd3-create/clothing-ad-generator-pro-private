@@ -247,3 +247,48 @@ export async function checkDeveloperProvider(id: string): Promise<ProviderConnec
     clearTimeout(timeout);
   }
 }
+
+
+export type EnabledTextProvider = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+};
+
+/**
+ * جلب مزودات النصوص المفعّلة والمهيأة من قاعدة البيانات لاستخدامها في التوليد التسويقي
+ * مع استبعاد مزودات معالجة وإزالة خلفية الصور تماماً.
+ */
+export async function listEnabledTextProviders(): Promise<EnabledTextProvider[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const providers = await db
+    .select()
+    .from(developerProviders)
+    .where(eq(developerProviders.isEnabled, 1));
+
+  return providers.flatMap(provider => {
+    if (!provider.encryptedApiKey) return [];
+    const isImageTool =
+      provider.model === PERFECT_CORP_BACKGROUND_REMOVE ||
+      provider.baseUrl === PERFECT_CORP_API_BASE_URL ||
+      /remove\.bg|background|s2s/i.test(provider.baseUrl) ||
+      /remove\.bg|background|s2s/i.test(provider.model);
+    if (isImageTool) return [];
+
+    try {
+      const apiKey = decryptProviderKey(provider.encryptedApiKey);
+      return [{
+        id: provider.id,
+        name: provider.name,
+        baseUrl: provider.baseUrl,
+        model: provider.model,
+        apiKey,
+      }];
+    } catch {
+      return [];
+    }
+  });
+}

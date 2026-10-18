@@ -4,13 +4,21 @@ import { formatMarketingTextForWhatsApp, generateLocalMarketingText, sanitizeMar
 
 vi.mock('./_core/env', () => ({ ENV: { forgeApiUrl: 'https://forge.test', forgeApiKey: 'test-key' } }));
 
+const mockStoredProviders = vi.fn().mockResolvedValue([]);
+vi.mock('./developerProviders', () => ({
+  listEnabledTextProviders: () => mockStoredProviders(),
+}));
+
 const { generateMarketingTextWithFallback, MARKETING_TEXT_MODEL_CHAIN } = await import('./marketingText');
 
 function modelResponse(text: string) {
   return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ text }) } }] }) };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  mockStoredProviders.mockResolvedValue([]);
+});
 
 const details = {
   ...DEFAULT_AD_DETAILS,
@@ -83,7 +91,59 @@ describe('مولد النص التسويقي العربي', () => {
     expect(text).toContain('📝 *فستان صيفي بتفاصيل مبهجة.*');
   });
 
+  it('يستخدم مزود النص المخزن في لوحة المطور أولاً بنجاح', async () => {
+    mockStoredProviders.mockResolvedValueOnce([
+      {
+        id: 'prov-groq-1',
+        name: 'Groq Llama 3',
+        baseUrl: 'https://api.groq.com/openai/v1',
+        model: 'llama-3.3-70b-versatile',
+        apiKey: 'gsk_test123',
+      },
+    ]);
+
+    const fetchMock = vi.fn().mockResolvedValueOnce(modelResponse('فستان صيفي بتفاصيل أنيقة وأقمشة مريحة تناسب ذوقك الرفيع.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMarketingTextWithFallback(details, { tone: 'formal', length: 'medium', goal: 'inquiry' });
+
+    expect(result).toMatchObject({ source: 'cloud', provider: 'Groq Llama 3' });
+    expect(result.text).toContain('فستان صيفي');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.groq.com/openai/v1/chat/completions');
+  });
+
+  it('ينتقل للمزود المخزن التالي عند تعثر المزود الأول بنظام التدوير والتهدئة', async () => {
+    mockStoredProviders.mockResolvedValueOnce([
+      {
+        id: 'prov-down',
+        name: 'OpenRouter Unavailable',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        model: 'openai/gpt-4o',
+        apiKey: 'sk_test_down',
+      },
+      {
+        id: 'prov-backup',
+        name: 'Groq Backup',
+        baseUrl: 'https://api.groq.com/openai/v1',
+        model: 'llama-3.3-70b-versatile',
+        apiKey: 'gsk_test_backup',
+      },
+    ]);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'Service Unavailable' })
+      .mockResolvedValueOnce(modelResponse('فستان صيفي خفيف وأنيق جاهز للطلب الفوري.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await generateMarketingTextWithFallback(details, { tone: 'persuasive', length: 'medium', goal: 'purchase' });
+
+    expect(result).toMatchObject({ source: 'cloud', provider: 'Groq Backup' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('يستخدم أول نموذج متصل صالحاً ويتوقف من دون استدعاء بقية النماذج', async () => {
+    mockStoredProviders.mockResolvedValueOnce([]);
     const fetchMock = vi.fn().mockResolvedValueOnce(modelResponse('فستان صيفي بتفاصيل أنيقة، تواصلي معنا لمعرفة الألوان المتاحة.'));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -96,6 +156,7 @@ describe('مولد النص التسويقي العربي', () => {
   });
 
   it('ينتقل إلى النموذج التالي بسرعة عند فشل الأول ثم يقبل أول رد صالح', async () => {
+    mockStoredProviders.mockResolvedValueOnce([]);
     const fetchMock = vi.fn()
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(modelResponse('وصل فستان صيفي بتفاصيل ناعمة وجاهز للطلب.'));
@@ -110,6 +171,7 @@ describe('مولد النص التسويقي العربي', () => {
   });
 
   it('يرفض النص المكوّن من نقاط فقط ثم ينتقل إلى النموذج التالي أو الرجوع المحلي', async () => {
+    mockStoredProviders.mockResolvedValueOnce([]);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(modelResponse('........'))
       .mockResolvedValueOnce(modelResponse('وصل فستان صيفي بتفاصيل ناعمة وجاهز للطلب.'));
@@ -123,6 +185,7 @@ describe('مولد النص التسويقي العربي', () => {
   });
 
   it('يرجع للنص المحلي فقط بعد تعذر النماذج الخمسة ولا يوقف الأداة', async () => {
+    mockStoredProviders.mockResolvedValueOnce([]);
     const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
     vi.stubGlobal('fetch', fetchMock);
 
