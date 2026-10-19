@@ -1,4 +1,14 @@
-import { formatMarketingTextForWhatsApp, generateLocalMarketingText, resolveMarketingTextPreferences, sanitizeMarketingText } from '../shared/marketingText';
+import {
+  buildWhatsAppSignature,
+  buildWhatsAppSystemPrompt,
+  buildWhatsAppUserPrompt,
+  cleanForWhatsApp,
+  formatMarketingTextForWhatsApp,
+  generateLocalMarketingText,
+  resolveMarketingTextPreferences,
+  sanitizeMarketingText,
+  validateMarketingText,
+} from '../shared/marketingText';
 import type { AdDetails, MarketingTextPreferences } from '../shared/types';
 import { ENV } from './_core/env';
 import { listEnabledTextProviders, type EnabledTextProvider } from './developerProviders';
@@ -29,67 +39,23 @@ function isUsableMarketingText(text: string) {
   return meaningful.length >= 6 && /[A-Za-z0-9\u0600-\u06FF]/.test(meaningful);
 }
 
-function buildMarketingPrompt(details: AdDetails, preferences: MarketingTextPreferences, variant: number) {
-  return JSON.stringify({
-    details: {
-      productName: details.productName,
-      headline: details.headline,
-      features: details.features,
-      colors: details.colors,
-      price: details.price,
-      currency: details.currency,
-      discount: details.discount,
-      quantity: details.quantity,
-      storeName: details.storeName,
-      storePhone: details.storePhone,
-      storeLocation: details.storeLocation,
-      storeCategory: details.storeCategory,
-    },
-    preferences,
-    copyVariant: variant,
-    rules: {
-      short: 'جملة أو جملتان قصيرتان.',
-      medium: '2 إلى 3 جمل موجزة.',
-      long: '3 إلى 5 جمل موجزة.',
-      price: 'اكتب السعر دائماً بعد الرقم، مثلاً 5000 ريال.',
-      privacy: 'لا توجد صورة في هذا الطلب. استخدم البيانات النصية فقط.',
-    },
-  });
-}
-
-function responseSchema() {
-  return {
-    type: 'json_schema',
-    json_schema: {
-      name: 'arabic_marketing_copy',
-      strict: true,
-      schema: {
-        type: 'object',
-        properties: { text: { type: 'string', minLength: 8, maxLength: 520 } },
-        required: ['text'],
-        additionalProperties: false,
-      },
-    },
-  } as const;
-}
-
 function extractGeneratedText(content: string): string {
   if (!content) return '';
   const trimmed = content.trim();
   try {
     const parsed = JSON.parse(trimmed) as { text?: unknown };
-    if (typeof parsed?.text === 'string') return sanitizeMarketingText(parsed.text);
+    if (typeof parsed?.text === 'string') return cleanForWhatsApp(parsed.text);
   } catch {
     // not raw JSON
   }
   const cleaned = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   try {
     const parsed = JSON.parse(cleaned) as { text?: unknown };
-    if (typeof parsed?.text === 'string') return sanitizeMarketingText(parsed.text);
+    if (typeof parsed?.text === 'string') return cleanForWhatsApp(parsed.text);
   } catch {
     // not JSON in fence
   }
-  return sanitizeMarketingText(cleaned);
+  return cleanForWhatsApp(cleaned);
 }
 
 async function askOpenAiCompatibleModel(
@@ -100,6 +66,9 @@ async function askOpenAiCompatibleModel(
   timeoutMs: number
 ): Promise<string> {
   const endpoint = `${provider.baseUrl.replace(/\/$/, '')}/chat/completions`;
+  const systemPrompt = buildWhatsAppSystemPrompt(preferences);
+  const userPrompt = buildWhatsAppUserPrompt(details, preferences, variant);
+
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -109,14 +78,11 @@ async function askOpenAiCompatibleModel(
     body: JSON.stringify({
       model: provider.model,
       messages: [
-        {
-          role: 'system',
-          content: 'أنت كاتب نصوص تسويقية باللغة العربية لمتجر ملابس وأزياء. اكتب نصاً تسويقياً جذاباً ومقنعاً للمنتج. اكتب النص مباشرة باللغة العربية بدون أي مقدمات أو شروحات وبدون أكواد. أرجع النتيجة فقط.',
-        },
-        { role: 'user', content: buildMarketingPrompt(details, preferences, variant) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
-      max_tokens: 360,
-      temperature: 0.7,
+      max_tokens: 420,
+      temperature: 0.75,
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -142,6 +108,9 @@ async function askGeminiMarketingModel(
   timeoutMs: number
 ): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const systemPrompt = buildWhatsAppSystemPrompt(preferences);
+  const userPrompt = buildWhatsAppUserPrompt(details, preferences, variant);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -150,14 +119,14 @@ async function askGeminiMarketingModel(
         {
           parts: [
             {
-              text: `أنت كاتب نصوص تسويقية باللغة العربية لمتجر ملابس. اكتب نصاً تسويقياً جذاباً ومباشراً بدون شروحات للمنتج:\n${buildMarketingPrompt(details, preferences, variant)}`,
+              text: `${systemPrompt}\n\nبيانات الطلب:\n${userPrompt}`,
             },
           ],
         },
       ],
       generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 360,
+        temperature: 0.75,
+        maxOutputTokens: 420,
       },
     }),
     signal: AbortSignal.timeout(timeoutMs),
@@ -182,6 +151,9 @@ async function askForgeMarketingModel(
   timeoutMs: number
 ): Promise<string> {
   if (!ENV.forgeApiUrl || !ENV.forgeApiKey) throw new Error('لا تتوفر خدمة النماذج المتصلة');
+  const systemPrompt = buildWhatsAppSystemPrompt(preferences);
+  const userPrompt = buildWhatsAppUserPrompt(details, preferences, variant);
+
   const response = await fetch(`${ENV.forgeApiUrl.replace(/\/$/, '')}/v1/chat/completions`, {
     method: 'POST',
     headers: {
@@ -190,15 +162,11 @@ async function askForgeMarketingModel(
     },
     body: JSON.stringify({
       model,
-      ...(model.startsWith('gpt-') ? { max_completion_tokens: 360 } : { max_tokens: 360 }),
+      ...(model.startsWith('gpt-') ? { max_completion_tokens: 420 } : { max_tokens: 420 }),
       messages: [
-        {
-          role: 'system',
-          content: 'أنت كاتب نصوص تسويقية عربية لمنتجات الملابس. اكتب بالفصحى الطبيعية في اتجاه RTL. كن جذاباً ومبهجاً ومقنعاً دون مبالغة أو غلط. لا تخترع خامة أو سعراً أو خصماً أو كمية أو ضماناً أو تقييمات أو شحناً أو ندرة غير موجودة في البيانات. لا تذكر أنك ذكاء اصطناعي. أعد JSON فقط ووفق المخطط.',
-        },
-        { role: 'user', content: buildMarketingPrompt(details, preferences, variant) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
-      response_format: responseSchema(),
     }),
     signal: AbortSignal.timeout(timeoutMs),
   });
@@ -219,7 +187,7 @@ export async function generateMarketingTextWithFallback(
   const local = generateLocalMarketingText(details, resolvedPreferences, variant);
   const deadline = Date.now() + TOTAL_CHAIN_TIMEOUT_MS;
 
-  // 1. مزودات الذكاء الاصطناعي النشطة والمحفوظة في لوحة المطور (مثل Groq وOpenRouter وGemini المتوافقة)
+  // 1. مزودات الذكاء الاصطناعي النشطة والمحفوظة في لوحة المطور (مثل Groq وOpenRouter وغيرها)
   let storedProviders: EnabledTextProvider[] = [];
   try {
     storedProviders = await listEnabledTextProviders();
@@ -235,7 +203,7 @@ export async function generateMarketingTextWithFallback(
     if (isProviderInCooldown(providerKey)) continue;
 
     try {
-      const text = await askOpenAiCompatibleModel(
+      const rawText = await askOpenAiCompatibleModel(
         provider,
         details,
         resolvedPreferences,
@@ -243,10 +211,9 @@ export async function generateMarketingTextWithFallback(
         Math.min(MODEL_TIMEOUT_MS, remainingMs)
       );
       resetProviderCooldown(providerKey);
+      const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
       return {
-        text: resolvedPreferences.format === 'whatsapp'
-          ? formatMarketingTextForWhatsApp(details, text, resolvedPreferences)
-          : text,
+        text: finalText,
         source: 'cloud',
         provider: provider.name || provider.model,
       };
@@ -266,17 +233,16 @@ export async function generateMarketingTextWithFallback(
       const remainingMs = deadline - Date.now();
       if (remainingMs < 500) break;
       try {
-        const text = await askForgeMarketingModel(
+        const rawText = await askForgeMarketingModel(
           provider,
           details,
           resolvedPreferences,
           variant,
           Math.min(MODEL_TIMEOUT_MS, remainingMs)
         );
+        const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
         return {
-          text: resolvedPreferences.format === 'whatsapp'
-            ? formatMarketingTextForWhatsApp(details, text, resolvedPreferences)
-            : text,
+          text: finalText,
           source: 'cloud',
           provider,
         };
@@ -291,7 +257,7 @@ export async function generateMarketingTextWithFallback(
     const geminiKey = 'gemini:marketing';
     if (!isProviderInCooldown(geminiKey)) {
       try {
-        const text = await askGeminiMarketingModel(
+        const rawText = await askGeminiMarketingModel(
           ENV.geminiApiKey,
           details,
           resolvedPreferences,
@@ -299,10 +265,9 @@ export async function generateMarketingTextWithFallback(
           Math.min(MODEL_TIMEOUT_MS, deadline - Date.now())
         );
         resetProviderCooldown(geminiKey);
+        const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
         return {
-          text: resolvedPreferences.format === 'whatsapp'
-            ? formatMarketingTextForWhatsApp(details, text, resolvedPreferences)
-            : text,
+          text: finalText,
           source: 'cloud',
           provider: 'Google Gemini',
         };
@@ -317,7 +282,7 @@ export async function generateMarketingTextWithFallback(
     }
   }
 
-  // 4. المحرك المحلي الاحتياطي التلقائي (يعمل دائماً بدون إنترنت وبدون أخطاء)
+  // 4. المحرك المحلي الاحتياطي التلقائي (يعمل دائماً دون اتصال وبأمان 100%)
   return {
     text: local.text,
     source: 'local-fallback',

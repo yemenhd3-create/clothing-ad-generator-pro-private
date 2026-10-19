@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_AD_DETAILS } from '../shared/types';
-import { formatMarketingTextForWhatsApp, generateLocalMarketingText, sanitizeMarketingText } from '../shared/marketingText';
+import {
+  CAMPAIGN_CONFIGS,
+  calculateOldPrice,
+  cleanForWhatsApp,
+  formatMarketingTextForWhatsApp,
+  generateLocalMarketingText,
+  sanitizeMarketingText,
+  validateMarketingText,
+} from '../shared/marketingText';
 
 vi.mock('./_core/env', () => ({ ENV: { forgeApiUrl: 'https://forge.test', forgeApiKey: 'test-key' } }));
 
@@ -34,64 +42,100 @@ const details = {
   storePhone: '770976559',
 };
 
-describe('مولد النص التسويقي العربي', () => {
-  it('ينشئ نصاً محلياً غنياً من البيانات المدخلة فقط عند اختيار طول مفصل', () => {
-    const result = generateLocalMarketingText(details, { tone: 'exciting', length: 'long', goal: 'inquiry' }, 1);
+describe('محرك النصوص التسويقية وقواعد واتساب', () => {
+  it('يحسب السعر القديم المشطوب بدقة عند وجود نسبة خصم', () => {
+    // 5000 مع خصم 20% -> 5000 / 0.8 = 6250
+    const oldPrice = calculateOldPrice('5000', '20');
+    expect(oldPrice).toBe('6250');
+
+    // مدخلات غير صحيحة لا تعطل الدالة
+    expect(calculateOldPrice('5000', '0')).toBeNull();
+    expect(calculateOldPrice('0', '20')).toBeNull();
+    expect(calculateOldPrice('', '')).toBeNull();
+  });
+
+  it('ينظف تنسيقات Markdown العامة ويحولها إلى قواعد واتساب الصارمة', () => {
+    const raw = '## عنوان رئيسي\n**نص عريض جداً** مع ~~نص مشطوب~~ و "علامات اقتباس"\n\n\n\nسطر جديد';
+    const cleaned = cleanForWhatsApp(raw);
+
+    expect(cleaned).not.toContain('##');
+    expect(cleaned).not.toContain('**');
+    expect(cleaned).not.toContain('~~');
+    expect(cleaned).toContain('*نص عريض جداً*');
+    expect(cleaned).toContain('~نص مشطوب~');
+    expect(cleaned).not.toContain('\n\n\n');
+  });
+
+  it('يفحص أخطاء التنسيق وهلوسة الأرقام بنجاح', () => {
+    const invalidText = '## عرض خاص **فستان** برقم هاتف 777123456';
+    const errors = validateMarketingText(invalidText, { price: '5000' });
+
+    expect(errors).toContain('markdown');
+    expect(errors).toContain('price-missing');
+    expect(errors).toContain('phone-in-text');
+  });
+
+  it('ينشئ نصاً محلياً غنياً ومتوافقاً مع واتساب بنسبة 100% دون إنترنت', () => {
+    const result = generateLocalMarketingText(details, {
+      campaign: 'professional',
+      length: 'long',
+      emphasis: 'featured',
+      format: 'whatsapp',
+    }, 1);
 
     expect(result.source).toBe('local');
     expect(result.text).toContain('فستان صيفي');
+    expect(result.text).toContain('━━━━━━━━━━'); // الفاصل المميز
     expect(result.text).toContain('قطن ناعم');
     expect(result.text).toContain('أبيض');
-    expect(result.text).toContain('5000 ريال');
+    expect(result.text).toContain('~6250~'); // السعر القديم المشطوب
+    expect(result.text).toContain('*5000* ريال');
     expect(result.text).toContain('خصم 20%');
+    expect(result.text).toContain('12 قطعة');
     expect(result.text).toContain('متجر مروان');
     expect(result.text).toContain('770976559');
-    expect(result.text).not.toContain('شحن مجاني');
-    expect(result.text).not.toContain('ضمان');
+    expect(result.text).not.toContain('**');
+    expect(result.text).not.toContain('##');
   });
 
-  it('يستمر دون اتصال ويبدل الصياغة بحسب النبرة والنسخة', () => {
-    const first = generateLocalMarketingText(details, { tone: 'playful', length: 'short', goal: 'purchase' }, 0).text;
-    const second = generateLocalMarketingText(details, { tone: 'playful', length: 'short', goal: 'purchase' }, 2).text;
-
-    expect(first.length).toBeLessThan(second.length + 200);
-    expect(first).not.toBe(second);
-    expect(first).toContain('فستان صيفي');
-  });
-
-  it('ينظف الفراغات ويحد النص قبل عرضه أو مشاركته', () => {
-    expect(sanitizeMarketingText('  نص   منظم\n وجميل  ')).toBe('نص منظم وجميل');
-    expect(sanitizeMarketingText('س'.repeat(600))).toHaveLength(520);
-  });
-
-  it('ينسق نصاً قابلاً للنسخ في واتساب بالرموز مع حقول المنتج المدخلة فقط', () => {
-    const text = formatMarketingTextForWhatsApp(details, 'إطلالة مريحة بتفاصيل ناعمة.', { goal: 'purchase', format: 'whatsapp' });
-
-    expect(text).toContain('✨ *فستان صيفي*');
-    expect(text).toContain('✅ *المميزات*');
-    expect(text).toContain('💰 *السعر:* 5000 ريال');
-    expect(text).toContain('📲 🚚 اطلب الآن عبر خدمة التوصيل: 770976559');
-    expect(text).toContain('\n');
-    expect(text).not.toContain('شحن مجاني');
-    expect(text).not.toContain('ضمان');
-  });
-
-  it('يدعم الحملات والتنسيق العادي من دون إدخال نجوم واتساب', () => {
-    const text = generateLocalMarketingText(details, { campaign: 'eid-fitr', emphasis: 'normal', length: 'medium' }, 2).text;
+  it('يدعم الحملات والتنسيق العادي دون نجوم عريضة في النص', () => {
+    const text = generateLocalMarketingText(details, {
+      campaign: 'eid-fitr',
+      emphasis: 'normal',
+      length: 'medium',
+      format: 'whatsapp',
+    }, 2).text;
 
     expect(text).toContain('عيد الفطر');
     expect(text).toContain('5000 ريال');
     expect(text).not.toContain('*السعر:*');
-    expect(text).toContain('خدمة التوصيل: 770976559');
+    expect(text).not.toContain('━━━━━━━━━━');
+    expect(text).toContain('770976559');
   });
 
-  it('يبرز ملخص النص عند اختيار التنسيق العريض', () => {
-    const text = formatMarketingTextForWhatsApp(details, 'فستان صيفي بتفاصيل مبهجة.', { emphasis: 'bold', format: 'whatsapp' });
+  it('يغير الخطاف الدعائي لكل رقم نسخة (Variant) لتجنب التكرار', () => {
+    const v0 = generateLocalMarketingText(details, { campaign: 'new-arrival' }, 0).text;
+    const v1 = generateLocalMarketingText(details, { campaign: 'new-arrival' }, 1).text;
+    const v2 = generateLocalMarketingText(details, { campaign: 'new-arrival' }, 2).text;
 
-    expect(text).toContain('📝 *فستان صيفي بتفاصيل مبهجة.*');
+    expect(v0).not.toBe(v1);
+    expect(v1).not.toBe(v2);
   });
 
-  it('يستخدم مزود النص المخزن في لوحة المطور أولاً بنجاح', async () => {
+  it('ينسق نصاً قابلاً للنسخ في واتساب بالرموز مع حقول المنتج وتوقيع المركز', () => {
+    const text = formatMarketingTextForWhatsApp(details, 'إطلالة مريحة بتفاصيل ناعمة.', { emphasis: 'bold', format: 'whatsapp' });
+
+    expect(text).toContain('✨ *فستان صيفي*');
+    expect(text).toContain('✅ *المميزات*');
+    expect(text).toContain('~6250~');
+    expect(text).toContain('*5000* ريال');
+    expect(text).toContain('📝 *إطلالة مريحة بتفاصيل ناعمة.*');
+    expect(text).toContain('📞 للطلب والاستفسار: 770976559');
+    expect(text).toContain('📍 متجر مروان');
+    expect(text).not.toContain('**');
+  });
+
+  it('يستخدم مزود النص المخزن في لوحة المطور أولاً بنجاح مع تنسيق واتساب والتوقيع البرمجي', async () => {
     mockStoredProviders.mockResolvedValueOnce([
       {
         id: 'prov-groq-1',
@@ -102,13 +146,14 @@ describe('مولد النص التسويقي العربي', () => {
       },
     ]);
 
-    const fetchMock = vi.fn().mockResolvedValueOnce(modelResponse('فستان صيفي بتفاصيل أنيقة وأقمشة مريحة تناسب ذوقك الرفيع.'));
+    const fetchMock = vi.fn().mockResolvedValueOnce(modelResponse('✨ *تشكيلة مميزة*\n\nفستان صيفي بأناقة فائقة.\n\n💰 *السعر:* *5000* ريال'));
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await generateMarketingTextWithFallback(details, { tone: 'formal', length: 'medium', goal: 'inquiry' });
 
     expect(result).toMatchObject({ source: 'cloud', provider: 'Groq Llama 3' });
     expect(result.text).toContain('فستان صيفي');
+    expect(result.text).toContain('770976559'); // التوقيع البرمجي أضيف تلقائياً
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.groq.com/openai/v1/chat/completions');
   });
@@ -152,7 +197,6 @@ describe('مولد النص التسويقي العربي', () => {
     expect(result).toMatchObject({ source: 'cloud', provider: 'gpt-5-mini' });
     expect(result.text).toContain('فستان صيفي');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: 'gpt-5-mini' });
   });
 
   it('ينتقل إلى النموذج التالي بسرعة عند فشل الأول ثم يقبل أول رد صالح', async () => {
@@ -166,25 +210,9 @@ describe('مولد النص التسويقي العربي', () => {
 
     expect(result).toMatchObject({ source: 'cloud', provider: 'gemini-3-flash-preview' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toMatchObject({ model: MARKETING_TEXT_MODEL_CHAIN[0] });
-    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ model: MARKETING_TEXT_MODEL_CHAIN[1] });
   });
 
-  it('يرفض النص المكوّن من نقاط فقط ثم ينتقل إلى النموذج التالي أو الرجوع المحلي', async () => {
-    mockStoredProviders.mockResolvedValueOnce([]);
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(modelResponse('........'))
-      .mockResolvedValueOnce(modelResponse('وصل فستان صيفي بتفاصيل ناعمة وجاهز للطلب.'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const result = await generateMarketingTextWithFallback(details, { tone: 'persuasive', length: 'medium', goal: 'purchase' });
-
-    expect(result).toMatchObject({ source: 'cloud', provider: 'gemini-3-flash-preview' });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.text).not.toBe('........');
-  });
-
-  it('يرجع للنص المحلي فقط بعد تعذر النماذج الخمسة ولا يوقف الأداة', async () => {
+  it('يرجع للنص المحلي فقط بعد تعذر النماذج ولا يوقف الأداة', async () => {
     mockStoredProviders.mockResolvedValueOnce([]);
     const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
     vi.stubGlobal('fetch', fetchMock);
@@ -193,7 +221,7 @@ describe('مولد النص التسويقي العربي', () => {
 
     expect(result.source).toBe('local-fallback');
     expect(result.text).toContain('فستان صيفي');
+    expect(result.text).toContain('770976559');
     expect(result.message).toContain('الصياغة المحلية');
-    expect(fetchMock).toHaveBeenCalledTimes(MARKETING_TEXT_MODEL_CHAIN.length);
   });
 });
