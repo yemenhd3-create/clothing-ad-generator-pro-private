@@ -1122,18 +1122,39 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     }
   };
 
+  const handleCopyMarketingText = async () => {
+    const textToCopy = getWardrobeShareText('whatsapp', marketingText);
+    if (!textToCopy) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+        toast.success('تم نسخ النص التسويقي للحافظة.');
+      }
+    } catch {
+      toast.error('تعذر نسخ النص للحافظة.');
+    }
+  };
+
   const handleWhatsApp = async () => {
     if (!generatedAd) return;
     if (!(await ensureExportAllowed())) return;
     try {
-      const shared = await shareViaWebAPI(generatedAd, adDetails.productName || 'إعلان ملابس', getWardrobeShareText('whatsapp', marketingText));
+      const textToShare = getWardrobeShareText('whatsapp', marketingText);
+      if (textToShare && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(textToShare);
+        } catch {
+          // silent fallback for clipboard
+        }
+      }
+      const shared = await shareViaWebAPI(generatedAd, adDetails.productName || 'إعلان ملابس', textToShare);
       if (shared) {
-        toast.success('تم فتح نافذة المشاركة. اختر واتساب لإرسال الإعلان.');
+        toast.success('تم فتح نافذة المشاركة، ونُسخ النص للحافظة! إذا لم يظهر كتعليق في متصفحك، الصقه مباشرة.');
         return;
       }
       downloadImage(generatedAd, `${adDetails.productName.trim() || 'إعلان-ملابس'}-${Date.now()}.png`);
-      shareToWhatsApp('', getWardrobeShareText('whatsapp', marketingText));
-      toast.success('حُفظ التصميم وفتح واتساب بالنص فقط. أرفق ملف PNG من التنزيلات؛ لا نشارك رابط المعاينة المؤقت.');
+      shareToWhatsApp('', textToShare);
+      toast.success('حُفظ التصميم ونُسخ النص للحافظة وفتح واتساب. أرفق صورة الإعلان من التنزيلات.');
     } catch {
       toast.error('تعذّرت المشاركة عبر واتساب. جرّب تنزيل الصورة أولاً.');
     }
@@ -1406,7 +1427,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 {designPassport && <DesignPassportCard passport={designPassport} onDownload={handleDownloadPassport} />}
                 {designContractReport && <DesignContractCard report={designContractReport} onApplyRepair={handleApplyContractRepair} historyEntries={(designHistory?.entries || []).map(entry => ({ id: entry.id, label: entry.label }))} historyFingerprint={designHistory ? designDocumentFingerprint(replayDesignHistory(designHistory)) : undefined} canUndoHistory={Boolean(designHistory?.entries.length)} canRedoHistory={Boolean(designRedoEntries.length)} onReplayHistory={handleReplayHistory} onUndoHistory={handleUndoHistory} onRedoHistory={handleRedoHistory} onRemoveHistoryEntry={handleRemoveHistoryEntry} />}
                 {qualityGateReport && <React.Suspense fallback={null}><DesignQualityGateCard report={qualityGateReport} onApplyRepair={handleApplyContractRepair} visualRepairStatus={visualRepairStatus} onUndoVisualRepair={visualRepairSnapshot ? handleUndoVisualRepair : undefined} /></React.Suspense>}
-                <React.Suspense fallback={<PageLoading label="جارٍ تجهيز خيارات المشاركة…" />}><SharePanel onDownload={handleDownload} onShare={handleShare} onWhatsApp={handleWhatsApp} onQualityCheck={handleCreatePassport} onContractCheck={handleCheckDesignContract} onExportGateCheck={handleCheckQualityGate} isQualityChecking={isCreatingPassport} isContractChecking={isCheckingDesignContract} isExportGateChecking={isCheckingQualityGate} exportBlocked={qualityGateReport?.exportAllowed === false} onEdit={() => setCurrentStep('details')} onClear={clearAdSession} /></React.Suspense>
+                <React.Suspense fallback={<PageLoading label="جارٍ تجهيز خيارات المشاركة…" />}><SharePanel onDownload={handleDownload} onShare={handleShare} onWhatsApp={handleWhatsApp} onCopyText={handleCopyMarketingText} onQualityCheck={handleCreatePassport} onContractCheck={handleCheckDesignContract} onExportGateCheck={handleCheckQualityGate} isQualityChecking={isCreatingPassport} isContractChecking={isCheckingDesignContract} isExportGateChecking={isCheckingQualityGate} exportBlocked={qualityGateReport?.exportAllowed === false} onEdit={() => setCurrentStep('details')} onClear={clearAdSession} /></React.Suspense>
               </>
             )}
           </section>
@@ -1508,14 +1529,120 @@ function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGene
       <button type="button" disabled={disabled || isGenerating} onClick={() => void generate()} className="reference-primary w-full">{isGenerating ? <><LoaderCircle className="animate-spin" size={16} />جارٍ التجهيز…</> : <><MessageSquareText size={16} />جهّز النص</>}</button>
       <button type="button" disabled={disabled} onClick={() => setShowOptions(value => !value)} className="reference-outline w-full"><SlidersHorizontal size={16} />خيارات</button>
     </div>
-    {showOptions && <div className="mt-2 rounded-xl bg-secondary/70 p-2"><div className="grid grid-cols-2 gap-2">
-      <select value={preferences.campaign} disabled={disabled} onChange={event => updatePreferences({ campaign: event.target.value as MarketingTextCampaign })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="أسلوب النص التسويقي">{campaignOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-      <select value={preferences.length} disabled={disabled} onChange={event => updatePreferences({ length: event.target.value as MarketingTextLength })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="حجم النص التسويقي">{lengthOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-      <select value={preferences.emphasis} disabled={disabled} onChange={event => updatePreferences({ emphasis: event.target.value as MarketingTextEmphasis, format: 'whatsapp' })} className="min-h-9 rounded-lg border border-primary/10 bg-white px-2 text-[11px] font-black text-primary outline-none focus:border-primary" aria-label="تنسيق نص واتساب">{emphasisOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
-      <input value={details.price} disabled={disabled} inputMode="numeric" onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })} placeholder="السعر (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="السعر للنص التسويقي" />
-      <input value={details.storePhone} disabled={disabled} inputMode="tel" onChange={event => updateDetails({ storePhone: event.target.value })} placeholder="رقم التوصيل (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="رقم التوصيل وواتساب" />
-      <input value={details.discount} disabled={disabled} inputMode="decimal" onChange={event => updateDetails({ discount: event.target.value })} placeholder="الخصم (اختياري)" className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-[11px] text-foreground outline-none focus:border-primary" aria-label="الخصم" />
-    </div></div>}
+    {showOptions && (
+      <div className="mt-2.5 space-y-2.5 rounded-2xl border border-primary/15 bg-white p-3 shadow-sm" dir="rtl">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-muted-foreground">الحملة:</span>
+            <span className="font-black text-primary">{MARKETING_TEXT_CAMPAIGN_LABELS[preferences.campaign || 'professional']}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {campaignOptions.map(([id, label]) => {
+              const active = (preferences.campaign || 'professional') === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => updatePreferences({ campaign: id })}
+                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
+                    active
+                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
+                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-muted-foreground">طول النص:</span>
+            <span className="font-black text-primary">{lengthOptions.find(([id]) => id === preferences.length)?.[1] || 'متوسط'}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {lengthOptions.map(([id, label]) => {
+              const active = preferences.length === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => updatePreferences({ length: id })}
+                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
+                    active
+                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
+                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-muted-foreground">التنسيق:</span>
+            <span className="font-black text-primary">{MARKETING_TEXT_EMPHASIS_LABELS[preferences.emphasis || 'featured']}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {emphasisOptions.map(([id, label]) => {
+              const active = (preferences.emphasis || 'featured') === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => updatePreferences({ emphasis: id, format: 'whatsapp' })}
+                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
+                    active
+                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
+                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 border-t border-primary/10 pt-2">
+          <input
+            value={details.price}
+            disabled={disabled}
+            inputMode="numeric"
+            onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })}
+            placeholder="السعر"
+            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
+            aria-label="السعر للنص التسويقي"
+          />
+          <input
+            value={details.discount}
+            disabled={disabled}
+            inputMode="decimal"
+            onChange={event => updateDetails({ discount: event.target.value })}
+            placeholder="الخصم %"
+            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
+            aria-label="الخصم"
+          />
+          <input
+            value={details.storePhone}
+            disabled={disabled}
+            inputMode="tel"
+            onChange={event => updateDetails({ storePhone: event.target.value })}
+            placeholder="رقم الهاتف"
+            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
+            aria-label="رقم التوصيل وواتساب"
+          />
+        </div>
+      </div>
+    )}
     {notice && <p className="mt-2 text-[10px] leading-4 text-muted-foreground" aria-live="polite">{notice}</p>}
   </div>;
 }
