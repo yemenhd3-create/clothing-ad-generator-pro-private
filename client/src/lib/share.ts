@@ -108,9 +108,27 @@ export async function shareViaWebAPI(
       return false;
     }
 
+    // Auto-copy text so users on browsers that drop caption with files (like Lemur or certain Android webviews) can easily paste it
+    if (text && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // silent fallback for clipboard
+      }
+    }
+
     const response = await fetch(imageUrl);
     const blob = await response.blob();
     const file = new File([blob], 'ad.png', { type: 'image/png' });
+
+    // Validate if the browser can share files
+    if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        title,
+        text,
+      });
+      return true;
+    }
 
     await navigator.share({
       title,

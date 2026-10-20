@@ -41,4 +41,11 @@ describe('final advertisement share panel', () => {
     expect(html).toContain('أوقفت بوابة الجودة الحفظ والمشاركة');
     expect((html.match(/disabled=""/g) || [])).toHaveLength(3);
   });
+  it('يعرض زر نسخ النص التسويقي للحافظة عند توفيره', () => {
+    const action = vi.fn();
+    const copyAction = vi.fn();
+    const html = renderToStaticMarkup(createElement(SharePanel, { onDownload: action, onShare: action, onWhatsApp: action, onCopyText: copyAction, onQualityCheck: action, onContractCheck: action, onExportGateCheck: action, onEdit: action, onClear: action }));
+
+    expect(html).toContain('نسخ النص التسويقي للحافظة');
+  });
 });
