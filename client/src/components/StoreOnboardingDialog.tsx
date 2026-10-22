@@ -56,6 +56,8 @@ export default function StoreOnboardingDialog({
     setShowAddCustom(false);
   };
 
+  if (!isOpen) return null;
+
   const handleSave = () => {
     const updated: MerchantProfile = {
       ...profile,
@@ -73,7 +75,7 @@ export default function StoreOnboardingDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in" dir="rtl">
-      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-primary/20 bg-background p-6 shadow-2xl">
+      <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-border bg-background p-6 shadow-2xl">
         <button
           type="button"
           onClick={onSkip}
@@ -106,7 +108,7 @@ export default function StoreOnboardingDialog({
               value={storeName}
               onChange={e => setStoreName(e.target.value)}
               placeholder="مثال: مركز الأناقة للأزياء"
-              className="h-11 w-full rounded-2xl border border-stone-200 bg-secondary/30 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
+              className="h-11 w-full rounded-2xl border border-border bg-muted/50 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
             />
           </div>
 
@@ -120,7 +122,7 @@ export default function StoreOnboardingDialog({
               value={storeLocation}
               onChange={e => setStoreLocation(e.target.value)}
               placeholder="مثال: صنعاء - شارع حدة، مقابل مول العاصمة"
-              className="h-11 w-full rounded-2xl border border-stone-200 bg-secondary/30 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
+              className="h-11 w-full rounded-2xl border border-border bg-muted/50 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
             />
           </div>
 
@@ -140,7 +142,7 @@ export default function StoreOnboardingDialog({
                     className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition active:scale-95 ${
                       isSelected
                         ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'border border-stone-200 bg-secondary/40 text-foreground hover:bg-secondary'
+                        : 'border border-border bg-secondary text-foreground hover:bg-secondary'
                     }`}
                   >
                     {isSelected && <Check size={13} />}
@@ -167,7 +169,7 @@ export default function StoreOnboardingDialog({
                 <button
                   type="button"
                   onClick={() => setShowAddCustom(true)}
-                  className="inline-flex items-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/10"
+                  className="inline-flex items-center gap-1 rounded-xl border border-dashed border-primary bg-primary/10 px-2.5 py-1.5 text-xs font-bold text-primary hover:bg-primary/10"
                 >
                   <Plus size={14} /> إضافة تصنيف
                 </button>
@@ -211,7 +213,7 @@ export default function StoreOnboardingDialog({
                 value={storePhone}
                 onChange={e => setStorePhone(e.target.value)}
                 placeholder="770000000"
-                className="h-11 w-full rounded-2xl border border-stone-200 bg-secondary/30 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
+                className="h-11 w-full rounded-2xl border border-border bg-muted/50 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
               />
             </div>
 
@@ -226,7 +228,7 @@ export default function StoreOnboardingDialog({
                 value={deliveryPhone}
                 onChange={e => setDeliveryPhone(e.target.value)}
                 placeholder="771111111"
-                className="h-11 w-full rounded-2xl border border-stone-200 bg-secondary/30 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
+                className="h-11 w-full rounded-2xl border border-border bg-muted/50 px-3.5 text-sm font-medium text-foreground outline-none transition focus:border-primary focus:bg-background"
               />
             </div>
           </div>
@@ -236,7 +238,7 @@ export default function StoreOnboardingDialog({
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-md transition active:scale-[0.98]"
+            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-md transition active:scale-95"
           >
             <Sparkles size={17} />
             حفظ وبدء العمل
@@ -244,7 +246,7 @@ export default function StoreOnboardingDialog({
           <button
             type="button"
             onClick={onSkip}
-            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-stone-200 bg-secondary/50 px-5 text-xs font-bold text-muted-foreground transition hover:bg-secondary active:scale-[0.98]"
+            className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-2xl border border-border bg-secondary px-5 text-xs font-bold text-muted-foreground transition hover:bg-secondary active:scale-95"
           >
             تخطي والإكمال لاحقاً
             <ArrowLeft size={15} />
