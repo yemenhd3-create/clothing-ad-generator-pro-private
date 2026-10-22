@@ -85,6 +85,7 @@ const SharePanel = React.lazy(() => import('@/components/SharePanel'));
 const DesignQualityGateCard = React.lazy(() => import('@/components/DesignQualityGateCard'));
 const TryOnStatusNotice = React.lazy(() => import('@/components/TryOnStatusNotice').then(module => ({ default: module.TryOnStatusNotice })));
 const UserTemplateSettings = React.lazy(() => import('@/components/UserTemplateSettings'));
+import StoreOnboardingDialog from '@/components/StoreOnboardingDialog';
 const MerchantAssistantWorkspace = React.lazy(() => import('@/components/MerchantAssistantWorkspace'));
 const ImageRefinementStudio = React.lazy(() => import('@/components/ImageRefinementStudio'));
 const EMPTY_AD_DETAILS: AdDetails = { ...DEFAULT_AD_DETAILS, features: [] };
@@ -170,6 +171,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const [selectedSuggestedSize, setSelectedSuggestedSize] = useState<TemplateSize>('portrait');
   const [preferenceProfile, setPreferenceProfile] = useState(() => loadPreferenceProfile());
   const [merchantProfile, setMerchantProfile] = useState(() => loadMerchantProfile());
+  const [showOnboarding, setShowOnboarding] = useState(() => !loadMerchantProfile().onboardingComplete);
   const [merchantAssistantSession, setMerchantAssistantSession] = useState<MerchantAssistantSession>(() => loadMerchantAssistantSession());
   const [templateBeforeSuggestion, setTemplateBeforeSuggestion] = useState<TemplateSettings | null>(null);
   const [comparisonPreviews, setComparisonPreviews] = useState<{ current: string; suggested: string } | null>(null);
@@ -769,6 +771,8 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       ...current,
       storeName: stored.storeName || current.storeName,
       storePhone: stored.storePhone || current.storePhone,
+      deliveryPhone: stored.deliveryPhone || current.deliveryPhone,
+      storeCategories: (stored.storeCategories && stored.storeCategories.length > 0) ? stored.storeCategories : current.storeCategories,
       storeLocation: stored.storeLocation || current.storeLocation,
       storeCategory: stored.storeCategory || current.storeCategory,
       discount: stored.defaultDiscount || current.discount,
@@ -1435,6 +1439,16 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       </main>
 
       {isRefinementStudioOpen && productImage && <React.Suspense fallback={<PageLoading label="جارٍ فتح استوديو التنقيح المحلي…" />}><ImageRefinementStudio source={productImage} onClose={() => setIsRefinementStudioOpen(false)} onApply={image => { setIsRefinementStudioOpen(false); handleImageSelect(image); toast.success('استبدلنا صورة القطعة بالنسخة المنقحة محلياً.'); }} /></React.Suspense>}
+
+      <StoreOnboardingDialog
+        isOpen={showOnboarding}
+        profile={merchantProfile}
+        onSave={(updated) => {
+          persistMerchantProfile(updated, true);
+          setShowOnboarding(false);
+        }}
+        onSkip={() => setShowOnboarding(false)}
+      />
 
       {!WARDROBE_ROOM_MODE && <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#ece8f0] bg-[#fdfbf8]/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl" aria-label="التنقل الرئيسي">
         <div className={`mx-auto grid max-w-md gap-2 ${WARDROBE_ROOM_MODE ? 'grid-cols-2' : 'grid-cols-4'}`}>
