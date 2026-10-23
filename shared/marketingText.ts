@@ -26,8 +26,9 @@ export const MARKETING_TEXT_TONE_LABELS: Record<MarketingTextTone, string> = {
 };
 
 export const MARKETING_TEXT_LENGTH_LABELS: Record<MarketingTextLength, string> = {
-  short: 'أساسي (قصير)',
-  medium: 'متوسط',
+  concise: 'مختصر (2-3 أسطر)',
+  short: 'أساسي (5-6 أسطر)',
+  medium: 'متوسط (8-9 أسطر)',
   long: 'كبير (مفصل)',
 };
 
@@ -118,6 +119,10 @@ export const CAMPAIGN_CONFIGS: Record<MarketingTextCampaign, CampaignConfig> = {
 };
 
 export const LENGTH_CONFIGS: Record<MarketingTextLength, { lineCount: string; description: string }> = {
+  concise: {
+    lineCount: '2-3 أسطر فقط',
+    description: 'خطّاف فوري ومباشر مع اسم القطعة + السعر ودعوة الطلب فقط، بدون أي سرد أو تفاصيل.',
+  },
   short: {
     lineCount: '5-6 أسطر',
     description: 'خطّاف + وصف + سعر + دعوة للطلب، بدون قائمة مزايا.',
@@ -157,7 +162,7 @@ export function resolveMarketingTextPreferences(
     tone: tone === 'exciting' || tone === 'persuasive' || tone === 'formal' || tone === 'playful'
       ? tone
       : DEFAULT_MARKETING_TEXT_PREFERENCES.tone,
-    length: length === 'short' || length === 'medium' || length === 'long'
+    length: length === 'concise' || length === 'short' || length === 'medium' || length === 'long'
       ? length
       : DEFAULT_MARKETING_TEXT_PREFERENCES.length,
     goal: goal === 'purchase' || goal === 'inquiry' || goal === 'showcase'
@@ -172,6 +177,7 @@ export function resolveMarketingTextPreferences(
     emphasis: emphasis === 'normal' || emphasis === 'bold' || emphasis === 'featured'
       ? emphasis
       : DEFAULT_MARKETING_TEXT_PREFERENCES.emphasis,
+    customInstructions: clean(preferences?.customInstructions) || undefined,
   };
 }
 
@@ -235,6 +241,15 @@ export function buildWhatsAppSystemPrompt(preferences: MarketingTextPreferences)
   const campaign = CAMPAIGN_CONFIGS[preferences.campaign];
   const length = LENGTH_CONFIGS[preferences.length];
   const format = FORMAT_CONFIGS[preferences.emphasis];
+  const customInstructions = clean(preferences.customInstructions);
+
+  const conciseRule = preferences.length === 'concise'
+    ? '\n9. تنبيه حاسم للطول المختصر: النص النهائي يجب أن يكون مقتضباً جداً (2-3 أسطر فقط)، يضم الخطاف مع اسم القطعة، السعر، ودعوة الطلب، بلا أي تفاصيل جانبية أو حشو.'
+    : '';
+
+  const customInstructionsRule = customInstructions
+    ? `\n10. تعليمات إضافية خاصة مطلوبة من المستخدم (أولوية تنفيذية قصوى):\n«${customInstructions}»\nاحرص على مراعاتها ودمجها بذكاء وسلاسة في صياغة النص دون الإخلال ببقية القواعد.`
+    : '';
 
   return `أنت كاتب محتوى تسويقي متخصص لمركز ملابس نسائية وأزياء، تكتب رسائل جاهزة للنشر في قناة واتساب مباشرة.
 
@@ -246,15 +261,12 @@ export function buildWhatsAppSystemPrompt(preferences: MarketingTextPreferences)
 5. لا تكتب رقم هاتف ولا عنواناً ولا اسم المركز إطلاقاً (الكود يضيف التوقيع برمجياً).
 6. استخدم الأرقام كما أُعطيت لك حرفياً، ولا تغيّر السعر أو الكمية.
 7. كل سطر لا يزيد عن 12 كلمة، وبين الأقسام سطر فارغ.
-8. لا تبدأ بعبارة مكررة، واختر خطّافاً مميزاً.
+8. لا تبدأ بعبارة مكررة، واختر خطّافاً مميزاً.${conciseRule}${customInstructionsRule}
 
 الهيكل المطلوب:
 [سطر الخطّاف بالعريض + إيموجي]
-${preferences.emphasis === 'featured' ? '[فاصل زخرفي ━━━━━━━━━━]' : ''}
-[جملة وصف واحدة موجزة]
-[المزايا - إن طُلبت في نوع الطول]
-[السعر مع السعر القديم مشطوباً إن وُجد]
-[الكمية / التوفر]
+${preferences.emphasis === 'featured' && preferences.length !== 'concise' ? '[فاصل زخرفي ━━━━━━━━━━]' : ''}
+${preferences.length === 'concise' ? '[السعر مباشرة]' : '[جملة وصف واحدة موجزة]\n[المزايا - إن طُلبت في نوع الطول]\n[السعر مع السعر القديم مشطوباً إن وُجد]\n[الكمية / التوفر]'}
 [دعوة صريحة للطلب]
 
 كتلة الحملة (${MARKETING_TEXT_CAMPAIGN_LABELS[preferences.campaign]}):
@@ -296,6 +308,7 @@ export function buildWhatsAppUserPrompt(
     campaign: MARKETING_TEXT_CAMPAIGN_LABELS[prefs.campaign] || MARKETING_TEXT_CAMPAIGN_LABELS.professional,
     length: MARKETING_TEXT_LENGTH_LABELS[prefs.length] || MARKETING_TEXT_LENGTH_LABELS.medium,
     format: MARKETING_TEXT_EMPHASIS_LABELS[prefs.emphasis] || MARKETING_TEXT_EMPHASIS_LABELS.featured,
+    customInstructions: clean(prefs.customInstructions) || undefined,
     variantSeed: variant,
   });
 }
@@ -325,6 +338,49 @@ export function generateLocalMarketingText(
   const hookIndex = Math.abs(variant) % campaign.hooks.length;
   const hookText = campaign.hooks[hookIndex];
   const hookIcon = campaign.icons.split(' ')[0] || '✨';
+
+  if (preferences.length === 'concise') {
+    const conciseLead = preferences.emphasis === 'normal'
+      ? `${hookIcon} ${hookText} — ${product}`
+      : `${hookIcon} *${hookText}* — ${product}`;
+
+    let concisePrice = '';
+    if (price) {
+      if (oldPrice) {
+        concisePrice = preferences.emphasis === 'normal'
+          ? `💰 السعر: ~${oldPrice}~ ${price} ${currency}`
+          : `💰 *السعر:* ~${oldPrice}~ *${price}* ${currency}`;
+      } else {
+        concisePrice = preferences.emphasis === 'normal'
+          ? `💰 السعر: ${price} ${currency}`
+          : `💰 *السعر:* *${price}* ${currency}`;
+      }
+    } else if (discount) {
+      concisePrice = preferences.emphasis === 'normal' ? `🏷️ خصم: ${discount}%` : `🏷️ *خصم خاص:* ${discount}%`;
+    }
+
+    const conciseCta = preferences.emphasis === 'normal' ? campaign.cta : `🛍️ *${campaign.cta}*`;
+    const conciseCustom = preferences.customInstructions ? (preferences.emphasis === 'normal' ? `💡 ${preferences.customInstructions}` : `💡 *${preferences.customInstructions}*`) : '';
+
+    const conciseSections = [
+      conciseLead,
+      concisePrice,
+      conciseCustom,
+      conciseCta,
+    ].filter(Boolean);
+
+    const conciseBody = cleanForWhatsApp(conciseSections.join('\n'));
+    const signature = buildWhatsAppSignature(details);
+    const fullText = preferences.format === 'whatsapp'
+      ? `${conciseBody}${signature}`
+      : sanitizeMarketingText(conciseBody);
+
+    return {
+      text: fullText,
+      source: 'local',
+    };
+  }
+
   const hookLine = preferences.emphasis === 'normal'
     ? `${hookIcon} ${hookText}`
     : `${hookIcon} *${hookText}*`;
@@ -388,6 +444,10 @@ export function generateLocalMarketingText(
   const ctaLine = preferences.emphasis === 'normal' ? campaign.cta : `🛍️ *${campaign.cta}*`;
 
   // تجميع الأقسام
+  const customLine = preferences.customInstructions
+    ? (preferences.emphasis === 'normal' ? `💡 ${preferences.customInstructions}` : `💡 *${preferences.customInstructions}*`)
+    : '';
+
   const sections: string[] = [
     hookLine,
     divider,
@@ -397,6 +457,7 @@ export function generateLocalMarketingText(
     priceLine,
     qtyLine,
     emotionalLine,
+    customLine,
     ctaLine,
   ].filter(Boolean);
 

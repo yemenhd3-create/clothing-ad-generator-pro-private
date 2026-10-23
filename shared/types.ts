@@ -45,7 +45,7 @@ export interface AdDetails {
 }
 
 export type MarketingTextTone = 'exciting' | 'persuasive' | 'formal' | 'playful';
-export type MarketingTextLength = 'short' | 'medium' | 'long';
+export type MarketingTextLength = 'concise' | 'short' | 'medium' | 'long';
 export type MarketingTextGoal = 'purchase' | 'inquiry' | 'showcase';
 export type MarketingTextEngine = 'local' | 'cloud';
 export type MarketingTextFormat = 'whatsapp' | 'plain';
@@ -60,6 +60,7 @@ export interface MarketingTextPreferences {
   format: MarketingTextFormat;
   campaign: MarketingTextCampaign;
   emphasis: MarketingTextEmphasis;
+  customInstructions?: string;
 }
 
 export type AdWorkflowStep = 'upload' | 'details' | 'final';
