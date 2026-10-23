@@ -205,17 +205,30 @@ export function validateMarketingText(text: string, input: { price?: string }): 
   return errors;
 }
 
-export function buildWhatsAppSignature(details: Pick<AdDetails, 'storeName' | 'storePhone' | 'storeLocation'>): string {
+export function buildWhatsAppSignature(
+  details: Pick<AdDetails, 'storeName' | 'storePhone' | 'storeLocation'> & {
+    deliveryPhone?: string;
+    storeCategories?: string[];
+  }
+): string {
   const parts: string[] = [];
-  const phone = clean(details.storePhone);
+  const inquiry = clean(details.storePhone);
+  const delivery = clean(details.deliveryPhone);
   const store = clean(details.storeName);
   const location = clean(details.storeLocation);
 
-  if (phone) parts.push(`📞 للطلب والاستفسار: ${phone}`);
+  if (inquiry && delivery && inquiry !== delivery) {
+    parts.push(`📞 للاستفسار: ${inquiry}`);
+    parts.push(`🚚 للطلب والتوصيل: ${delivery}`);
+  } else {
+    const singlePhone = delivery || inquiry;
+    if (singlePhone) parts.push(`📞 للطلب والاستفسار: ${singlePhone}`);
+  }
+
   if (store) parts.push(`📍 ${store}`);
   if (location && !store.includes(location)) parts.push(`🏢 ${location}`);
 
-  return parts.length ? `\n\n${parts.join('\n')}` : '';
+  return parts.length ? ('\n\n' + parts.join('\n')) : '';
 }
 
 export function buildWhatsAppSystemPrompt(preferences: MarketingTextPreferences): string {
@@ -259,9 +272,13 @@ ${preferences.emphasis === 'featured' ? '[فاصل زخرفي ━━━━━━
 
 export function buildWhatsAppUserPrompt(
   details: AdDetails,
-  preferences: MarketingTextPreferences,
-  variant: number
+  preferences?: Partial<MarketingTextPreferences>,
+  variant = 0
 ): string {
+  const prefs: MarketingTextPreferences = {
+    ...DEFAULT_MARKETING_TEXT_PREFERENCES,
+    ...preferences,
+  };
   const oldPrice = calculateOldPrice(details.price, details.discount);
   return JSON.stringify({
     item: clean(details.productName) || 'هذه القطعة المميزة',
@@ -273,9 +290,12 @@ export function buildWhatsAppUserPrompt(
     oldPrice: oldPrice || undefined,
     discountPercentage: clean(details.discount) || undefined,
     quantity: clean(details.quantity) || undefined,
-    campaign: MARKETING_TEXT_CAMPAIGN_LABELS[preferences.campaign],
-    length: MARKETING_TEXT_LENGTH_LABELS[preferences.length],
-    format: MARKETING_TEXT_EMPHASIS_LABELS[preferences.emphasis],
+    storeName: clean(details.storeName) || undefined,
+    storeCategory: clean(details.storeCategory) || (details.storeCategories && details.storeCategories.length > 0 ? details.storeCategories.join('، ') : undefined),
+    storeLocation: clean(details.storeLocation) || undefined,
+    campaign: MARKETING_TEXT_CAMPAIGN_LABELS[prefs.campaign] || MARKETING_TEXT_CAMPAIGN_LABELS.professional,
+    length: MARKETING_TEXT_LENGTH_LABELS[prefs.length] || MARKETING_TEXT_LENGTH_LABELS.medium,
+    format: MARKETING_TEXT_EMPHASIS_LABELS[prefs.emphasis] || MARKETING_TEXT_EMPHASIS_LABELS.featured,
     variantSeed: variant,
   });
 }

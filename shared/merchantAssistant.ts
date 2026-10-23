@@ -30,8 +30,10 @@ export type MerchantProfile = {
   onboardingComplete: boolean;
   storeName: string;
   storePhone: string;
+  deliveryPhone?: string;
   storeLocation: string;
   storeCategory: string;
+  storeCategories?: string[];
   defaultDiscount?: string;
   preferredTheme?: TemplateVisualTheme;
   preferredProductScale?: number;
@@ -162,8 +164,10 @@ export function createMerchantProfile(): MerchantProfile {
     onboardingComplete: false,
     storeName: '',
     storePhone: '',
+    deliveryPhone: '',
     storeLocation: '',
     storeCategory: '',
+    storeCategories: ['نسائي', 'بناتي', 'أطفال', 'شنط', 'أحذية'],
     defaultDiscount: '',
     defaultColors: [],
     hiddenElements: [],
@@ -189,8 +193,12 @@ export function normalizeMerchantProfile(value: unknown): MerchantProfile {
     onboardingComplete: source.onboardingComplete === true,
     storeName: cleanText(source.storeName),
     storePhone: cleanText(source.storePhone, 32),
+    deliveryPhone: cleanText(source.deliveryPhone, 32),
     storeLocation: cleanText(source.storeLocation),
     storeCategory: cleanText(source.storeCategory, 48),
+    storeCategories: Array.isArray(source.storeCategories)
+      ? Array.from(new Set(source.storeCategories.map(c => cleanText(c, 32)).filter(Boolean))).slice(0, 10)
+      : ['نسائي', 'بناتي', 'أطفال', 'شنط', 'أحذية'],
     defaultDiscount: cleanText(source.defaultDiscount, 32),
     preferredTheme: theme,
     preferredProductScale: Number.isFinite(scale) ? Math.min(PRODUCT_SCALE_MAX, Math.max(PRODUCT_SCALE_MIN, scale)) : undefined,
@@ -213,8 +221,10 @@ export function applyMerchantProfileToMarketingDetails(details: AdDetails, profi
     ...details,
     storeName: cleanText(details.storeName) || safe.storeName,
     storePhone: cleanText(details.storePhone, 32) || safe.storePhone,
+    deliveryPhone: cleanText(details.deliveryPhone, 32) || safe.deliveryPhone,
     storeLocation: cleanText(details.storeLocation) || safe.storeLocation,
     storeCategory: cleanText(details.storeCategory, 48) || safe.storeCategory,
+    storeCategories: (details.storeCategories && details.storeCategories.length > 0) ? details.storeCategories : safe.storeCategories,
     discount: cleanText(details.discount, 32) || cleanText(safe.defaultDiscount, 32),
     colors: details.colors.length > 0 ? details.colors : safe.defaultColors,
   };
