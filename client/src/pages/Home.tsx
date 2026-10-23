@@ -1530,7 +1530,7 @@ function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGene
     setNotice(`${result.message || 'الرسالة جاهزة.'} اضغط «واتساب + نص» أسفل القالب للإرسال.`);
   };
   const campaignOptions = Object.entries(MARKETING_TEXT_CAMPAIGN_LABELS) as Array<[MarketingTextCampaign, string]>;
-  const lengthOptions: Array<[MarketingTextLength, string]> = [['short', 'أساسي'], ['medium', 'متوسط'], ['long', 'كبير']];
+  const lengthOptions: Array<[MarketingTextLength, string]> = [['concise', 'مختصر'], ['short', 'أساسي'], ['medium', 'متوسط'], ['long', 'كبير']];
   const emphasisOptions = Object.entries(MARKETING_TEXT_EMPHASIS_LABELS) as Array<[MarketingTextEmphasis, string]>;
 
   return <div>
@@ -1653,6 +1653,20 @@ function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGene
             placeholder="رقم الهاتف"
             className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
             aria-label="رقم التوصيل وواتساب"
+          />
+        </div>
+
+        <div className="space-y-1.5 border-t border-primary/10 pt-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-muted-foreground">تعليمات خاصة (اختياري):</span>
+          </div>
+          <input
+            value={preferences.customInstructions || ''}
+            disabled={disabled}
+            onChange={event => updatePreferences({ customInstructions: event.target.value })}
+            placeholder="مثال: ركّز على خامة الصيف، أو عرض حبتين"
+            className="min-h-9 w-full rounded-lg border border-primary/10 px-2 text-xs text-foreground outline-none focus:border-primary"
+            aria-label="تعليمات إضافية للنص التسويقي"
           />
         </div>
       </div>

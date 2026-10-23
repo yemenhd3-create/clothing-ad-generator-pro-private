@@ -224,4 +224,34 @@ describe('محرك النصوص التسويقية وقواعد واتساب', (
     expect(result.text).toContain('770976559');
     expect(result.message).toContain('الصياغة المحلية');
   });
+
+  it('يدعم خيار النص المختصر (concise) بأسطر مقتضبة ومباشرة', () => {
+    const result = generateLocalMarketingText(details, {
+      campaign: 'professional',
+      length: 'concise',
+      emphasis: 'bold',
+      format: 'whatsapp',
+    }, 0);
+
+    expect(result.source).toBe('local');
+    expect(result.text).toContain('فستان صيفي');
+    expect(result.text).toContain('*5000* ريال');
+    // لا يجب أن يحتوي على فواصل زخرفية طويلة أو سرد مزايا مفصل
+    expect(result.text).not.toContain('━━━━━━━━━━');
+    expect(result.text).not.toContain('قطن ناعم');
+    expect(result.text).toContain('متجر مروان');
+  });
+
+  it('يدمج التعليمات والتوجيهات المخصصة customInstructions بذكاء في النص المحلي', () => {
+    const result = generateLocalMarketingText(details, {
+      campaign: 'new-arrival',
+      length: 'short',
+      emphasis: 'featured',
+      format: 'whatsapp',
+      customInstructions: 'توصيل مجاني عند طلب قطعتين',
+    }, 1);
+
+    expect(result.text).toContain('💡');
+    expect(result.text).toContain('توصيل مجاني عند طلب قطعتين');
+  });
 });
