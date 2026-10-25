@@ -255,3 +255,35 @@ describe('محرك النصوص التسويقية وقواعد واتساب', (
     expect(result.text).toContain('توصيل مجاني عند طلب قطعتين');
   });
 });
+
+describe('currency normalization to riyal', () => {
+  it('cleans any Saudi or Yemeni riyal annotations and converts to simple ريال in cleanForWhatsApp', async () => {
+    const { cleanForWhatsApp } = await import('../shared/marketingText');
+    expect(cleanForWhatsApp('💰 *السعر:* *4000* ريال سعودي')).toBe('💰 *السعر:* *4000* ريال');
+    expect(cleanForWhatsApp('💰 *السعر:* 4000 ر.س')).toBe('💰 *السعر:* 4000 ريال');
+    expect(cleanForWhatsApp('💰 *السعر:* 4000 SAR')).toBe('💰 *السعر:* 4000 ريال');
+    expect(cleanForWhatsApp('💰 *السعر:* *4000* ريال يمني')).toBe('💰 *السعر:* *4000* ريال');
+  });
+
+  it('normalizes currency input in normalizeMarketingCurrency', async () => {
+    const { normalizeMarketingCurrency } = await import('../shared/marketingText');
+    expect(normalizeMarketingCurrency('ريال سعودي')).toBe('ريال');
+    expect(normalizeMarketingCurrency('ر.س')).toBe('ريال');
+    expect(normalizeMarketingCurrency('SAR')).toBe('ريال');
+    expect(normalizeMarketingCurrency('ريال يمني')).toBe('ريال');
+    expect(normalizeMarketingCurrency('')).toBe('ريال');
+    expect(normalizeMarketingCurrency(undefined)).toBe('ريال');
+    expect(normalizeMarketingCurrency('ريال')).toBe('ريال');
+  });
+
+  it('includes strict currency rule in system prompt', async () => {
+    const { buildWhatsAppSystemPrompt } = await import('../shared/marketingText');
+    const prompt = buildWhatsAppSystemPrompt({
+      campaign: 'professional',
+      length: 'medium',
+      emphasis: 'standard',
+    });
+    expect(prompt).toContain('قاعدة العملة الصارمة: اكتب العملة بكلمة «ريال» فقط');
+    expect(prompt).toContain('ممنوع منعاً باتاً كتابة «سعودي» أو «ريال سعودي»');
+  });
+});
