@@ -192,12 +192,37 @@ export function calculateOldPrice(priceStr?: string, discountStr?: string): stri
   return oldPrice > price ? String(oldPrice) : null;
 }
 
+export function normalizeMarketingCurrency(raw?: string): string {
+  const c = clean(raw);
+  if (!c) return 'ريال';
+  return c
+    .replace(/ريال(?:اً|ٍ|ٌ)?\s*سعودي(?:اً|ة)?/gi, 'ريال')
+    .replace(/ريالات\s+سعودية/gi, 'ريال')
+    .replace(/(?:^|\s)(?:ر\.س|رس)(?:$|\s)/gi, ' ريال ')
+    .replace(/(?<=\d)\s*(?:ر\.س|رس)/gi, ' ريال')
+    .replace(/\bSAR\b/gi, 'ريال')
+    .replace(/ريال(?:اً|ٍ|ٌ)?\s*يمني(?:اً|ة)?/gi, 'ريال')
+    .replace(/ريالات\s+يمنية/gi, 'ريال')
+    .replace(/\bYER\b/gi, 'ريال')
+    .replace(/ريال\s+ريال/g, 'ريال')
+    .trim() || 'ريال';
+}
+
 export function cleanForWhatsApp(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, '*$1*')     // **نص** إلى *نص*
     .replace(/~~(.+?)~~/g, '~$1~')          // ~~نص~~ إلى ~نص~
     .replace(/^#{1,6}\s*/gm, '')            // إزالة عناوين Markdown
     .replace(/^["«»“”]+|["«»“”]+$/g, '')    // إزالة علامات الاقتباس المحيطة
+    .replace(/ريال(?:اً|ٍ|ٌ)?\s+سعودي(?:اً|ة)?/g, 'ريال') // تحويل ريال سعودي إلى ريال
+    .replace(/ريالات\s+سعودية/g, 'ريال')
+    .replace(/(?:^|\s)(?:ر\.س|رس)(?:$|\s)/gi, ' ريال ')
+    .replace(/(?<=\d)\s*(?:ر\.س|رس)/gi, ' ريال')
+    .replace(/\bSAR\b/gi, 'ريال')
+    .replace(/ريال(?:اً|ٍ|ٌ)?\s+يمني(?:اً|ة)?/g, 'ريال')  // توحيد ريال يمني إلى ريال
+    .replace(/ريالات\s+يمنية/g, 'ريال')
+    .replace(/\bYER\b/gi, 'ريال')
+    .replace(/ريال\s+ريال/g, 'ريال')
     .replace(/\n{3,}/g, '\n\n')             // أسطر فارغة زائدة
     .trim();
 }
@@ -244,11 +269,11 @@ export function buildWhatsAppSystemPrompt(preferences: MarketingTextPreferences)
   const customInstructions = clean(preferences.customInstructions);
 
   const conciseRule = preferences.length === 'concise'
-    ? '\n9. تنبيه حاسم للطول المختصر: النص النهائي يجب أن يكون مقتضباً جداً (2-3 أسطر فقط)، يضم الخطاف مع اسم القطعة، السعر، ودعوة الطلب، بلا أي تفاصيل جانبية أو حشو.'
+    ? '\n10. تنبيه حاسم للطول المختصر: النص النهائي يجب أن يكون مقتضباً جداً (2-3 أسطر فقط)، يضم الخطاف مع اسم القطعة، السعر، ودعوة الطلب، بلا أي تفاصيل جانبية أو حشو.'
     : '';
 
   const customInstructionsRule = customInstructions
-    ? `\n10. تعليمات إضافية خاصة مطلوبة من المستخدم (أولوية تنفيذية قصوى):\n«${customInstructions}»\nاحرص على مراعاتها ودمجها بذكاء وسلاسة في صياغة النص دون الإخلال ببقية القواعد.`
+    ? `\n11. تعليمات إضافية خاصة مطلوبة من المستخدم (أولوية تنفيذية قصوى):\n«${customInstructions}»\nاحرص على مراعاتها ودمجها بذكاء وسلاسة في صياغة النص دون الإخلال ببقية القواعد.`
     : '';
 
   return `أنت كاتب محتوى تسويقي متخصص لمركز ملابس نسائية وأزياء، تكتب رسائل جاهزة للنشر في قناة واتساب مباشرة.
@@ -260,8 +285,9 @@ export function buildWhatsAppSystemPrompt(preferences: MarketingTextPreferences)
 4. اكتب بالعربية البيضاء البسيطة، بنبرة دافئة وخطاب مؤنث موجّه للزبونة.
 5. لا تكتب رقم هاتف ولا عنواناً ولا اسم المركز إطلاقاً (الكود يضيف التوقيع برمجياً).
 6. استخدم الأرقام كما أُعطيت لك حرفياً، ولا تغيّر السعر أو الكمية.
-7. كل سطر لا يزيد عن 12 كلمة، وبين الأقسام سطر فارغ.
-8. لا تبدأ بعبارة مكررة، واختر خطّافاً مميزاً.${conciseRule}${customInstructionsRule}
+7. قاعدة العملة الصارمة: اكتب العملة بكلمة «ريال» فقط (مثل: 4000 ريال). ممنوع منعاً باتاً كتابة «سعودي» أو «ريال سعودي» أو «ر.س» أو «SAR» نهائياً.
+8. كل سطر لا يزيد عن 12 كلمة، وبين الأقسام سطر فارغ.
+9. لا تبدأ بعبارة مكررة، واختر خطّافاً مميزاً.${conciseRule}${customInstructionsRule}
 
 الهيكل المطلوب:
 [سطر الخطّاف بالعريض + إيموجي]
@@ -298,7 +324,7 @@ export function buildWhatsAppUserPrompt(
     features: details.features?.map(clean).filter(Boolean) || [],
     colors: details.colors?.map(clean).filter(Boolean) || [],
     price: clean(details.price) || undefined,
-    currency: clean(details.currency) || 'ريال',
+    currency: normalizeMarketingCurrency(details.currency),
     oldPrice: oldPrice || undefined,
     discountPercentage: clean(details.discount) || undefined,
     quantity: clean(details.quantity) || undefined,
@@ -329,7 +355,7 @@ export function generateLocalMarketingText(
   const features = (details.features || []).map(clean).filter(Boolean);
   const colors = (details.colors || []).map(clean).filter(Boolean);
   const price = clean(details.price);
-  const currency = clean(details.currency) || 'ريال';
+  const currency = normalizeMarketingCurrency(details.currency);
   const discount = clean(details.discount);
   const oldPrice = calculateOldPrice(price, discount);
   const quantity = clean(details.quantity);
@@ -495,7 +521,7 @@ export function formatMarketingTextForWhatsApp(
     const features = (details.features || []).map(escapeWhatsAppEmphasis).filter(Boolean).slice(0, 3);
     const colors = (details.colors || []).map(escapeWhatsAppEmphasis).filter(Boolean).slice(0, 3);
     const price = escapeWhatsAppEmphasis(details.price);
-    const currency = escapeWhatsAppEmphasis(details.currency) || 'ريال';
+    const currency = normalizeMarketingCurrency(details.currency);
     const discount = escapeWhatsAppEmphasis(details.discount);
     const oldPrice = calculateOldPrice(price, discount);
     const quantity = escapeWhatsAppEmphasis(details.quantity);
