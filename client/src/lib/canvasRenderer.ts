@@ -1,4 +1,5 @@
 import { DEFAULT_PRODUCT_SCALE, PRODUCT_SCALE_MAX, PRODUCT_SCALE_MIN, type AdDetails, type ProductPresentationEffect, type ProductShadowPreset, type ProductStudioBackdrop, type TemplateBadgeType, type TemplateSettings, type TemplateSize } from '@shared/types';
+import type { AdCopyLayer } from '@shared/adCopyStudio';
 import { getArtworkTransform } from '@shared/artworkLayout';
 import { getDesignGeometry } from '@shared/designGeometry';
 import { getTemplateTheme, type TemplateThemePalette } from '@shared/templateThemes';
@@ -9,6 +10,8 @@ export interface RenderOptions {
   quality?: number;
   visualMode?: 'garment' | 'transparentPerson';
   garmentTransform?: { x: number; y: number; width: number; height: number };
+  productRotationDegrees?: number;
+  productPivot?: 'center' | 'top-center';
 }
 
 const TEMPLATE_FONT_FAMILY = 'Cairo, Tahoma, Arial, sans-serif';
@@ -31,6 +34,10 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   const layout: Layout = { width, height, scale: width / 1080, font: (weight, size) => `${weight} ${Math.round(size * (width / 1080))}px ${TEMPLATE_FONT_FAMILY}` };
   const geometry = createGeometry(template.size, width, height);
   const palette = getTemplateTheme(template.visualTheme).palette;
+  if (template.commercialPosterTemplate && template.commercialPosterTemplate !== 'classic') {
+    const blob = await renderCommercialPoster(details, template, productImageSrc, layout);
+    return URL.createObjectURL(blob);
+  }
   const studioOnly = isStudioOnly(details, template);
   const hero = studioOnly ? createStudioHero(template.size, width, height) : geometry.hero;
   if (studioOnly) drawWardrobeBackdrop(ctx, { x: 0, y: 0, width, height }, template.productBackdrop || 'soft', palette);
@@ -44,7 +51,7 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   }
 
   if (!studioOnly) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
-  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly);
+  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly, options.productRotationDegrees || 0, options.productPivot || 'center');
   if (studioOnly) drawWardrobeOverlays(ctx, template, layout);
   if (!studioOnly) {
     drawBadges(ctx, details, template, geometry.badge, layout, palette);
@@ -55,9 +62,55 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
     else if (template.showStoreInfo && (details.storeName.trim() || details.storePhone.trim())) drawFooter(ctx, details, geometry.footer, layout, palette);
   }
 
+  if (template.adCopyLayers?.length) drawAdCopyLayers(ctx, template.adCopyLayers, layout);
   const blob = await canvasToBlob(canvas, 'image/png', options.quality || 0.92);
   return URL.createObjectURL(blob);
 }
+
+async function renderCommercialPoster(details: AdDetails, template: TemplateSettings, productImageSrc: string, layout: Layout): Promise<Blob> {
+  const canvas = document.createElement('canvas'); canvas.width = layout.width; canvas.height = layout.height;
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('تعذر تهيئة مساحة القالب التجاري');
+  const variant = template.commercialPosterTemplate || 'lavender-curve';
+  const isMidnight = variant === 'midnight-editorial'; const isRose = variant === 'rose-catalog';
+  const colors = isMidnight ? { page: '#12142b', card: '#1d2043', accent: '#bba8ff', ink: '#ffffff', muted: '#d5d3e3', soft: '#343866', footer: '#292b55' } : isRose ? { page: '#fff8f8', card: '#fffdfd', accent: '#a94f69', ink: '#54243a', muted: '#765a66', soft: '#f4dce4', footer: '#f6e8ee' } : { page: '#fbfaff', card: '#ffffff', accent: '#352080', ink: '#2f1b78', muted: '#6e6978', soft: '#ded4ef', footer: '#f3eff9' };
+  ctx.fillStyle = colors.page; ctx.fillRect(0, 0, layout.width, layout.height);
+  const margin = layout.width * .07; const card = { x: margin, y: layout.height * .1, width: layout.width - margin * 2, height: layout.height * .82 };
+  roundedRect(ctx, card.x, card.y, card.width, card.height, layout.width * .035); ctx.fillStyle = colors.card; ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.moveTo(card.x, card.y); ctx.lineTo(card.x + card.width * .36, card.y); ctx.bezierCurveTo(card.x + card.width * .05, card.y + card.height * .16, card.x + card.width * .08, card.y + card.height * .48, card.x, card.y + card.height * .56); ctx.lineTo(card.x, card.y + card.height); ctx.lineTo(card.x + card.width * .24, card.y + card.height); ctx.bezierCurveTo(card.x + card.width * .12, card.y + card.height * .72, card.x + card.width * .14, card.y + card.height * .22, card.x + card.width * .36, card.y); ctx.closePath(); ctx.fillStyle = colors.soft; ctx.fill(); ctx.restore();
+  drawPosterDots(ctx, card.x + card.width * .08, card.y + card.height * .12, colors.accent, layout.width); drawPosterDots(ctx, card.x + card.width * .08, card.y + card.height * .75, colors.accent, layout.width);
+  if (template.showStoreLogo && template.storeLogoArtwork) await drawArtwork(ctx, template.storeLogoArtwork, { x: card.x + card.width * .79, y: card.y + card.height * .055, width: card.width * .14, height: card.height * .12 }, 'contain'); else drawPosterBrandMark(ctx, card.x + card.width * .86, card.y + card.height * .12, colors.accent, layout.width);
+  drawPosterText(ctx, 'معاينة الإعلان', card.x + card.width / 2, layout.height * .045, layout.width * .032, colors.ink, 900, 'center'); drawPosterText(ctx, 'قبل الحفظ', card.x + card.width / 2, layout.height * .073, layout.width * .022, colors.muted, 600, 'center');
+  const productBox = { x: card.x + card.width * .06, y: card.y + card.height * .17, width: card.width * .53, height: card.height * .62 };
+  await drawHero(ctx, productImageSrc, productBox, 'garment', template.smartGarmentTransform, template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', false);
+  const infoX = card.x + card.width * .91; const infoWidth = card.width * .38;
+  drawPosterText(ctx, details.productName.trim() || 'اسم القطعة', infoX, card.y + card.height * .27, layout.width * .046, colors.ink, 900, 'right', infoWidth); drawPosterText(ctx, details.headline.trim() || 'أناقة تعكس ذوقك', infoX, card.y + card.height * .32, layout.width * .021, colors.muted, 600, 'right', infoWidth);
+  drawPosterText(ctx, details.price.trim() ? `${details.price.trim()} ${details.currency.trim() || 'ريال'}` : 'السعر', infoX, card.y + card.height * .48, layout.width * .047, colors.accent, 900, 'right', infoWidth);
+  if (details.discount.trim()) { roundedRect(ctx, infoX - infoWidth, card.y + card.height * .53, infoWidth, card.height * .07, card.height * .035); ctx.fillStyle = colors.accent; ctx.fill(); drawPosterText(ctx, `خصم ${details.discount.trim()}%`, infoX - infoWidth / 2, card.y + card.height * .565, layout.width * .024, '#ffffff', 800, 'center', infoWidth); }
+  const body = details.marketingText.trim() || details.features.filter(Boolean).join('، ') || 'تفاصيل أنيقة وجودة مميزة بتصميم يناسب كل إطلالة.'; drawPosterText(ctx, body, infoX, card.y + card.height * .66, layout.width * .021, colors.muted, 600, 'right', infoWidth);
+  const footer = { x: card.x + card.width * .05, y: card.y + card.height * .87, width: card.width * .9, height: card.height * .08 }; roundedRect(ctx, footer.x, footer.y, footer.width, footer.height, footer.height * .3); ctx.fillStyle = colors.footer; ctx.fill();
+  drawPosterText(ctx, details.storeLocation?.trim() || 'عنوان مركز الملابس', footer.x + footer.width * .18, footer.y + footer.height / 2, layout.width * .018, colors.ink, 700, 'center', footer.width * .32); drawPosterText(ctx, details.storePhone.trim() || 'رقم التواصل', footer.x + footer.width * .53, footer.y + footer.height / 2, layout.width * .018, colors.ink, 700, 'center', footer.width * .28); drawPosterText(ctx, template.studioCaption?.trim() || 'اطلب الآن', footer.x + footer.width * .83, footer.y + footer.height / 2, layout.width * .019, colors.accent, 900, 'center', footer.width * .24);
+  if (template.adCopyLayers?.length) drawAdCopyLayers(ctx, template.adCopyLayers, layout);
+  return canvasToBlob(canvas, 'image/png', .94);
+}
+
+function drawAdCopyLayers(ctx: CanvasRenderingContext2D, layers: AdCopyLayer[], layout: Layout) {
+  layers.filter(layer => layer.visible && layer.text.trim()).forEach(layer => {
+    ctx.save();
+    const x = Math.max(layout.width * .03, Math.min(layout.width * .97, layer.x * layout.width));
+    const y = Math.max(layout.height * .03, Math.min(layout.height * .97, layer.y * layout.height));
+    const size = Math.max(12, Math.round(layer.fontSize * layout.scale));
+    ctx.font = `${layer.weight} ${size}px ${layer.fontFamily || TEMPLATE_FONT_FAMILY}`;
+    ctx.fillStyle = layer.color || '#352080'; ctx.textAlign = layer.align; ctx.textBaseline = 'middle'; ctx.direction = 'rtl';
+    const maxWidth = layout.width * .42;
+    if (ctx.measureText(layer.text).width > maxWidth) drawWrappedText(ctx, layer.text, x, y - size * .65, maxWidth, size * 1.24, 3);
+    else ctx.fillText(layer.text, x, y);
+    ctx.restore();
+  });
+}
+
+function drawPosterText(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size: number, color: string, weight: number, align: CanvasTextAlign, maxWidth?: number) { if (!value.trim()) return; ctx.save(); ctx.fillStyle = color; ctx.font = `${weight} ${Math.max(12, Math.round(size))}px ${TEMPLATE_FONT_FAMILY}`; ctx.textAlign = align; ctx.textBaseline = 'middle'; if (maxWidth && ctx.measureText(value).width > maxWidth) drawWrappedText(ctx, value, x, y - size * .55, maxWidth, size * 1.25, 3); else ctx.fillText(value, x, y); ctx.restore(); }
+function drawPosterDots(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, width: number) { ctx.save(); ctx.fillStyle = color; for (let row = 0; row < 4; row += 1) for (let column = 0; column < 4; column += 1) { ctx.beginPath(); ctx.arc(x + column * width * .018, y + row * width * .018, Math.max(1.5, width * .003), 0, Math.PI * 2); ctx.fill(); } ctx.restore(); }
+function drawPosterBrandMark(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, width: number) { ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, width * .008); ctx.beginPath(); ctx.moveTo(x, y - width * .035); ctx.lineTo(x + width * .035, y); ctx.lineTo(x, y + width * .035); ctx.lineTo(x - width * .035, y); ctx.closePath(); ctx.stroke(); ctx.fillStyle = color; ctx.font = `900 ${Math.max(10, Math.round(width * .018))}px ${TEMPLATE_FONT_FAMILY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ملابس', x, y); ctx.restore(); }
 
 function isStudioOnly(details: AdDetails, template: TemplateSettings) {
   return template.wardrobeStudio === true || (!details.productName.trim() && !details.headline.trim() && !details.price.trim()
@@ -199,7 +252,7 @@ function drawWardrobeLabel(ctx: CanvasRenderingContext2D, value: string, options
   ctx.fillStyle = options.textColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + width / 2, options.top + height / 2); ctx.restore();
 }
 
-async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Box, visualMode: 'garment' | 'transparentPerson', transform?: { x: number; y: number; width: number; height: number }, productScale?: number, shadow: ProductShadowPreset = 'soft', presentation: ProductPresentationEffect = 'flat', studioOnly = false) {
+async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Box, visualMode: 'garment' | 'transparentPerson', transform?: { x: number; y: number; width: number; height: number }, productScale?: number, shadow: ProductShadowPreset = 'soft', presentation: ProductPresentationEffect = 'flat', studioOnly = false, rotationDegrees = 0, pivot: 'center' | 'top-center' = 'center') {
   const padding = Math.min(box.width, box.height) * (studioOnly ? .06 : .015);
   const safeBox = { x: box.x + padding, y: box.y + padding, width: box.width - padding * 2, height: box.height - padding * 2 };
   const selected = transform ? constrainedHeroTransform(safeBox, transform) : safeBox;
@@ -213,9 +266,15 @@ async function drawHero(ctx: CanvasRenderingContext2D, imageSrc: string, box: Bo
   const foregroundPlacement = isLifted ? { ...placement, y: placement.y - elevation } : placement;
   if (visualMode === 'garment' && presentation === 'platform') drawProductPlatform(ctx, placement);
   if (isLifted) drawProductLift(ctx, image, sourceBounds, foregroundPlacement, elevation);
+  const angle = rotationDegrees * Math.PI / 180;
+  const pivotX = foregroundPlacement.x + foregroundPlacement.width / 2;
+  const pivotY = pivot === 'top-center' ? foregroundPlacement.y + Math.min(foregroundPlacement.height * .12, 44) : foregroundPlacement.y + foregroundPlacement.height / 2;
+  ctx.save();
+  if (angle) ctx.translate(pivotX, pivotY), ctx.rotate(angle), ctx.translate(-pivotX, -pivotY);
   drawProductShadow(ctx, isLifted ? { ...placement, y: placement.y + elevation * .32 } : placement, shadow);
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(image, sourceBounds.x, sourceBounds.y, sourceBounds.width, sourceBounds.height, foregroundPlacement.x, foregroundPlacement.y, foregroundPlacement.width, foregroundPlacement.height);
+  ctx.restore();
   ctx.restore();
 }
 

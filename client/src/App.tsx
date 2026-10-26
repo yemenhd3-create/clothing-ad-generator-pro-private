@@ -47,6 +47,10 @@ function PersonalHome() {
 }
 
 function ProjectAccessGate() {
+  const previewMode = import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview') === '1';
+  if (previewMode) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز النسخة التجريبية…" />}><AuthenticatedApplication friendTestMode /></Suspense>;
+  }
   return (
     <Suspense fallback={<LoadingScreen text="جارٍ فتح مساحتك الشخصية…" />}>
       <PersonalAccessGate>

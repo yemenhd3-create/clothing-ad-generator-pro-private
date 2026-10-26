@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -33,6 +34,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  app.get("/_app/health", (_req, res) => res.status(200).json({ ok: true }));
+  app.get("/manus-routes.json", (_req, res) => res.sendFile(path.resolve(process.cwd(), "public/manus-routes.json")));
   // Keep this aligned with the validated 12M-character image data contracts.
   // Product images are otherwise processed locally in the browser, not posted as files.
   app.use(express.json({ limit: API_REQUEST_BODY_LIMIT }));
@@ -46,8 +49,6 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
-      // The Android app sends queries as POST (see client/src/main.tsx).
-      allowMethodOverride: true,
     })
   );
   // development mode uses Vite, production mode uses static files

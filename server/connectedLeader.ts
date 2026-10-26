@@ -2,12 +2,6 @@ import { ENV } from "./_core/env";
 import { parseMerchantCommands } from "@shared/merchantAssistant";
 import { resolveLocalLeaderPlan } from "@shared/localLeader";
 import { listEnabledConnectedLeaderProviders, type EnabledConnectedLeaderProvider } from "./developerProviders";
-import {
-  classifyProviderError,
-  isProviderInCooldown,
-  markProviderCooldown,
-  resetProviderCooldown,
-} from "./aiProviderErrors";
 
 export type ConnectedLeaderSource = "gemini-flash" | "gemini-flash-lite" | "llm7" | "free-ai" | "local-fallback";
 type GeminiLeaderSource = "gemini-flash" | "gemini-flash-lite";
@@ -94,40 +88,21 @@ async function askStoredProvider(provider: EnabledConnectedLeaderProvider, messa
 export async function getConnectedLeaderReply(message: string): Promise<ConnectedLeaderReply> {
   if (ENV.geminiApiKey) {
     for (const candidate of GEMINI_MODELS) {
-      const geminiKey = `gemini:${candidate.id}`;
-      if (isProviderInCooldown(geminiKey)) continue;
-
       try {
         const reply = await askGemini(candidate.id, message, candidate.thinkingLevel);
-        resetProviderCooldown(geminiKey);
         return { reply, source: candidate.source, usedFallback: candidate.source !== "gemini-flash" };
-      } catch (err: unknown) {
-        const statusMatch = err instanceof Error ? err.message.match(/returned (\d+)/) : null;
-        const status = statusMatch ? Number(statusMatch[1]) : undefined;
-        const classified = classifyProviderError(status, err instanceof Error ? err.message : undefined);
-        if (classified.shouldCooldown) {
-          markProviderCooldown(geminiKey, classified.cooldownMs);
-        }
+      } catch {
+        // Try the independent model tier before checking an owner-enabled alternative.
       }
     }
   }
 
   const alternatives = await Promise.resolve(listEnabledConnectedLeaderProviders()).catch(() => []);
   for (const provider of alternatives ?? []) {
-    const providerKey = `${provider.adapter}:${provider.model}`;
-    if (isProviderInCooldown(providerKey)) continue;
-
     try {
       const reply = await askStoredProvider(provider, message);
-      resetProviderCooldown(providerKey);
       return { reply, source: provider.adapter, usedFallback: true };
-    } catch (err: unknown) {
-      const statusMatch = err instanceof Error ? err.message.match(/returned (\d+)/) : null;
-      const status = statusMatch ? Number(statusMatch[1]) : undefined;
-      const classified = classifyProviderError(status, err instanceof Error ? err.message : undefined);
-      if (classified.shouldCooldown) {
-        markProviderCooldown(providerKey, classified.cooldownMs);
-      }
+    } catch {
       // A stored provider must never prevent the local leader from answering.
     }
   }

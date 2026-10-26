@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { clearAllProviderCooldowns, markProviderCooldown } from "./aiProviderErrors";
 
 const originalFetch = global.fetch;
 const listEnabledConnectedLeaderProvidersMock = vi.hoisted(() => vi.fn());
@@ -17,7 +16,6 @@ afterEach(() => {
   global.fetch = originalFetch;
   vi.unstubAllEnvs();
   listEnabledConnectedLeaderProvidersMock.mockReset();
-  clearAllProviderCooldowns();
 });
 
 describe("connected leader provider chain", () => {
@@ -66,37 +64,5 @@ describe("connected leader provider chain", () => {
     const { getConnectedLeaderReply } = await loadLeader();
     await expect(getConnectedLeaderReply("اقترح وصفاً قصيراً")).resolves.toMatchObject({ source: 'free-ai', reply: 'رد Free.ai', usedFallback: true });
     expect(global.fetch).toHaveBeenCalledWith('https://api.free.ai/v1/chat/', expect.objectContaining({ method: 'POST' }));
-  });
-
-  it("rotates past an unauthorized or quota-exhausted provider to the next valid alternative", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-    listEnabledConnectedLeaderProvidersMock.mockResolvedValue([
-      { adapter: 'llm7', baseUrl: 'https://api.llm7.io/v1', model: 'default', apiKey: 'bad-key' },
-      { adapter: 'free-ai', baseUrl: 'https://api.free.ai/v1', model: 'qwen7b', apiKey: 'good-key' },
-    ]);
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce(new Response("Unauthorized", { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: 'رد Free.ai بعد التدوير' } }] }), { status: 200 }));
-
-    const { getConnectedLeaderReply } = await loadLeader();
-    const result = await getConnectedLeaderReply("اقتراح تصميم");
-    expect(result).toMatchObject({ source: 'free-ai', reply: 'رد Free.ai بعد التدوير', usedFallback: true });
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("skips a provider that is currently in cooldown and proceeds to the next provider", async () => {
-    vi.stubEnv("GEMINI_API_KEY", "");
-    listEnabledConnectedLeaderProvidersMock.mockResolvedValue([
-      { adapter: 'llm7', baseUrl: 'https://api.llm7.io/v1', model: 'default', apiKey: 'key-1' },
-      { adapter: 'free-ai', baseUrl: 'https://api.free.ai/v1', model: 'qwen7b', apiKey: 'key-2' },
-    ]);
-    markProviderCooldown('llm7:default', 60_000);
-    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: 'رد فوري بدون انتظار' } }] }), { status: 200 }));
-
-    const { getConnectedLeaderReply } = await loadLeader();
-    const result = await getConnectedLeaderReply("اقتراح");
-    expect(result).toMatchObject({ source: 'free-ai', reply: 'رد فوري بدون انتظار', usedFallback: true });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).toHaveBeenCalledWith('https://api.free.ai/v1/chat/', expect.anything());
   });
 });

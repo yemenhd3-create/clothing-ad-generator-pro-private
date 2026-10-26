@@ -21,6 +21,7 @@ vi.mock('../client/src/lib/trpc', () => ({
       removeBackground: { useMutation: () => ({ mutateAsync: removeBackgroundMutateAsync }) },
     },
     marketingText: { generate: { useMutation: () => ({ mutateAsync: vi.fn() }) } },
+    adCopyStudio: { generate: { useMutation: () => ({ mutateAsync: vi.fn() }) } },
     leader: { connected: { useMutation: () => ({ mutateAsync: vi.fn() }) } },
     personal: { announcement: { useQuery: () => ({ data: null }) } },
   },

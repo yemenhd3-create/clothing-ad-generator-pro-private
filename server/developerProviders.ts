@@ -1,4 +1,3 @@
-import { classifyProviderError, resetProviderCooldown } from './aiProviderErrors';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { desc, eq } from 'drizzle-orm';
 import { developerProviders } from '../drizzle/schema';
@@ -36,16 +35,9 @@ export type ConnectedLeaderProviderVerification = {
 };
 
 export function connectedLeaderVerificationFailure(presetLabel: string, status: number): ConnectedLeaderProviderVerification {
-  const classified = classifyProviderError(status);
-  if (classified.kind === 'QUOTA_EXHAUSTED') {
-    return { verified: false, status: 402, message: `وصل ${presetLabel} لكن الحصة أو الرصيد غير متاح حالياً. سيستمر القائد المحلي.` };
-  }
-  if (classified.kind === 'RATE_LIMIT') {
-    return { verified: false, status: 429, message: `وصل ${presetLabel} لكنه يطبق حد الطلبات حالياً. لم يُرفض المفتاح؛ انتظر قليلاً ثم أعد التحقق.` };
-  }
-  if (classified.kind === 'INVALID_KEY') {
-    return { verified: false, status, message: `رفض ${presetLabel} المفتاح أو الصلاحية. راجع المفتاح في حساب المزود.` };
-  }
+  if (status === 402) return { verified: false, status: 402, message: `وصل ${presetLabel} لكن الحصة أو الرصيد غير متاح حالياً. سيستمر القائد المحلي.` };
+  if (status === 429) return { verified: false, status: 429, message: `وصل ${presetLabel} لكنه يطبق حد الطلبات حالياً. لم يُرفض المفتاح؛ انتظر قليلاً ثم أعد التحقق.` };
+  if (status === 401 || status === 403) return { verified: false, status, message: `رفض ${presetLabel} المفتاح أو الصلاحية. راجع المفتاح في حساب المزود.` };
   return { verified: false, status, message: `تعذر اعتماد ${presetLabel} بسبب استجابة الخدمة.` };
 }
 
@@ -173,11 +165,9 @@ export async function verifyConnectedLeaderProvider(id: string): Promise<Connect
     if (response.ok) {
       const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       const hasText = Boolean(body.choices?.[0]?.message?.content?.trim());
-      if (hasText) {
-        resetProviderCooldown(`${preset.id}:${preset.model.split(':').at(-1)}`);
-        return { verified: true, status: response.status, message: `نجح رد نصي قصير من ${preset.label}. المفتاح والمسار جاهزان للقائد المتصل.` };
-      }
-      return { verified: false, status: response.status, message: `استجاب ${preset.label} دون نص صالح؛ لم نعتمد المزود.` };
+      return hasText
+        ? { verified: true, status: response.status, message: `نجح رد نصي قصير من ${preset.label}. المفتاح والمسار جاهزان للقائد المتصل.` }
+        : { verified: false, status: response.status, message: `استجاب ${preset.label} دون نص صالح؛ لم نعتمد المزود.` };
     }
     return connectedLeaderVerificationFailure(preset.label, response.status);
   } catch {
@@ -246,49 +236,4 @@ export async function checkDeveloperProvider(id: string): Promise<ProviderConnec
   } finally {
     clearTimeout(timeout);
   }
-}
-
-
-export type EnabledTextProvider = {
-  id: string;
-  name: string;
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-};
-
-/**
- * جلب مزودات النصوص المفعّلة والمهيأة من قاعدة البيانات لاستخدامها في التوليد التسويقي
- * مع استبعاد مزودات معالجة وإزالة خلفية الصور تماماً.
- */
-export async function listEnabledTextProviders(): Promise<EnabledTextProvider[]> {
-  const db = await getDb();
-  if (!db) return [];
-  const providers = await db
-    .select()
-    .from(developerProviders)
-    .where(eq(developerProviders.isEnabled, 1));
-
-  return providers.flatMap(provider => {
-    if (!provider.encryptedApiKey) return [];
-    const isImageTool =
-      provider.model === PERFECT_CORP_BACKGROUND_REMOVE ||
-      provider.baseUrl === PERFECT_CORP_API_BASE_URL ||
-      /remove\.bg|background|s2s/i.test(provider.baseUrl) ||
-      /remove\.bg|background|s2s/i.test(provider.model);
-    if (isImageTool) return [];
-
-    try {
-      const apiKey = decryptProviderKey(provider.encryptedApiKey);
-      return [{
-        id: provider.id,
-        name: provider.name,
-        baseUrl: provider.baseUrl,
-        model: provider.model,
-        apiKey,
-      }];
-    } catch {
-      return [];
-    }
-  });
 }

@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
 import DeveloperAccessCodes from './DeveloperAccessCodes';
-import DeveloperAiUsageLogs from './DeveloperAiUsageLogs';
 
 export default function DeveloperPersonalConsole() {
   const utils = trpc.useUtils();
@@ -93,8 +92,6 @@ export default function DeveloperPersonalConsole() {
       </section>
 
       <DeveloperAccessCodes />
-
-      <DeveloperAiUsageLogs />
 
       <section className="rounded-[28px] bg-white p-5 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-7">
         <div className="mb-4 flex items-center gap-2 text-primary"><MessageSquareText size={20} /><h3 className="font-black">رسائل المستخدمين</h3></div>

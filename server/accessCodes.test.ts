@@ -19,8 +19,4 @@ describe('رموز الدخول', () => {
     expect(getAccessCodeEligibility({ isRevoked: 0, expiresAt: new Date('2026-08-17T17:29:59.000Z'), maxUses: null, useCount: 0 }, now)).toEqual({ eligible: false, reason: 'expired' });
     expect(getAccessCodeEligibility({ isRevoked: 0, expiresAt: null, maxUses: 2, useCount: 2 }, now)).toEqual({ eligible: false, reason: 'exhausted' });
   });
-  it('يرفض الرمز الذي نفد رصيد الكريدت منه ويسمح بالرمز المشحون', () => {
-    expect(getAccessCodeEligibility({ isRevoked: 0, expiresAt: null, maxUses: null, useCount: 1, aiCreditsTotal: 500, aiCreditsUsed: 500 })).toEqual({ eligible: false, reason: 'credits_exhausted' });
-    expect(getAccessCodeEligibility({ isRevoked: 0, expiresAt: null, maxUses: null, useCount: 1, aiCreditsTotal: 500, aiCreditsUsed: 250 })).toEqual({ eligible: true, reason: null });
-  });
 });

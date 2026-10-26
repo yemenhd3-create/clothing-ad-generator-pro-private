@@ -89,28 +89,4 @@ describe('developer provider tRPC routes', () => {
     expect(saveMock.mock.calls[0]?.[0]).not.toHaveProperty('apiKey');
     expect(saved.enabled).toBe(false);
   });
-
-  it('queries, resets single, and clears all provider cooldowns through tRPC routes', async () => {
-    const caller = appRouter.createCaller(createContext());
-
-    const { markProviderCooldown } = await import('./aiProviderErrors');
-    markProviderCooldown('prov-test-1', 60_000);
-
-    const cooldowns = await caller.developer.providers.cooldowns();
-    expect(cooldowns['prov-test-1']).toBeDefined();
-    expect(cooldowns['prov-test-1']?.inCooldown).toBe(true);
-
-    const resetResult = await caller.developer.providers.resetCooldown({ id: 'prov-test-1' });
-    expect(resetResult).toEqual({ success: true, id: 'prov-test-1' });
-
-    const cooldownsAfterReset = await caller.developer.providers.cooldowns();
-    expect(cooldownsAfterReset['prov-test-1']).toBeUndefined();
-
-    markProviderCooldown('prov-test-2', 60_000);
-    const clearResult = await caller.developer.providers.clearAllCooldowns();
-    expect(clearResult).toEqual({ success: true });
-
-    const emptyCooldowns = await caller.developer.providers.cooldowns();
-    expect(Object.keys(emptyCooldowns)).toHaveLength(0);
-  });
 });

@@ -3,7 +3,6 @@ import { trpc } from '@/lib/trpc';
 import { clearOfflineLease, hasValidOfflineLease, saveOfflineLease } from '@/lib/offlineAccess';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
 import { startLogin } from '@/const';
-import { isNativeApp } from '@/lib/nativeApp';
 import { KeyRound, LockKeyhole, LogIn, ShieldAlert, Wifi, ShieldCheck } from 'lucide-react';
 import React, { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -78,7 +77,7 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
     if (modeQuery.data?.registrationOpen === false) {
       return <AccessShell icon={<ShieldAlert size={30} />} title="التسجيل الجديد متوقف" description="أوقف المطور إنشاء حسابات أو أكواد جديدة مؤقتاً. الحسابات المعتمدة تستمر في الدخول عند توفر اتصال." action={<PwaInstallPrompt />} />;
     }
-    return <AccessShell icon={<LockKeyhole size={28} />} title="دخول إلى المساحة الشخصية" description="أدخل رمز الوصول الذي أنشأه المطور، أو استخدم حسابك المعتاد إذا كان لديك." action={<><AccessCodeEntry onPlatformLogin={() => startLogin()} />{!isNativeApp() && <DeveloperEntry />}<PwaInstallPrompt /></>} />;
+    return <AccessShell icon={<LockKeyhole size={28} />} title="دخول إلى المساحة الشخصية" description="أدخل رمز الوصول الذي أنشأه المطور، أو استخدم حسابك المعتاد إذا كان لديك." action={<><AccessCodeEntry onPlatformLogin={() => startLogin()} /><DeveloperEntry /><PwaInstallPrompt /></>} />;
   }
 
   if (accessQuery.data?.isDisabled) {

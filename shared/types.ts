@@ -1,3 +1,5 @@
+import type { AdCopyLayer } from './adCopyStudio';
+
 /**
  * Core Types for Clothing Ad Generator
  * All types are shared between client and server
@@ -35,17 +37,15 @@ export interface AdDetails {
   features: string[];
   storeName: string;
   storePhone: string;
-  deliveryPhone?: string;
   storeLocation?: string;
   storeCategory?: string;
-  storeCategories?: string[];
   marketingText: string;
   marketingPreferences?: MarketingTextPreferences;
   marketingTextEngine?: MarketingTextEngine;
 }
 
 export type MarketingTextTone = 'exciting' | 'persuasive' | 'formal' | 'playful';
-export type MarketingTextLength = 'concise' | 'short' | 'medium' | 'long';
+export type MarketingTextLength = 'short' | 'medium' | 'long';
 export type MarketingTextGoal = 'purchase' | 'inquiry' | 'showcase';
 export type MarketingTextEngine = 'local' | 'cloud';
 export type MarketingTextFormat = 'whatsapp' | 'plain';
@@ -60,7 +60,6 @@ export interface MarketingTextPreferences {
   format: MarketingTextFormat;
   campaign: MarketingTextCampaign;
   emphasis: MarketingTextEmphasis;
-  customInstructions?: string;
 }
 
 export type AdWorkflowStep = 'upload' | 'details' | 'final';
@@ -205,6 +204,7 @@ export const PRODUCT_SCALE_STEP = 0.04;
 export const DEFAULT_PRODUCT_SCALE = 0.92;
 /** نمط بصري محلي مستقل عن مقاس التصدير؛ يبقى اختياريًا لتوافق المسودات القديمة. */
 export type TemplateVisualTheme = 'classic' | 'midnight' | 'rose' | 'mint' | 'sand';
+export type CommercialPosterTemplate = 'classic' | 'lavender-curve' | 'midnight-editorial' | 'rose-catalog';
 /** خلفية استديو محلية داخل منطقة المنتج؛ لا تتطلب نموذج صور أو اتصالاً خارجياً. */
 export type ProductStudioBackdrop = 'auto' | 'soft' | 'warm' | 'cool' | 'spotlight' | 'rose' | 'sand' | 'plum' | 'peach' | 'blush' | 'navy' | 'denim' | 'sky' | 'teal' | 'mint' | 'sage' | 'lemon' | 'coral' | 'charcoal' | 'ivory' | 'lavender';
 /** ظل هندسي محلي يوضع أسفل المنتج الشفاف داخل مساحة البطل. */
@@ -230,6 +230,10 @@ export type ArtworkLayoutsBySize = Partial<Record<TemplateSize, Partial<Record<A
 /** Settings exposed to the regular user. AI providers and API keys are deliberately excluded. */
 export interface TemplateSettings {
   size: TemplateSize;
+  /** طبقات النص القصير التي يحررها المستخدم داخل استوديو معلومات الإعلان. */
+  adCopyLayers?: AdCopyLayer[];
+  /** تخطيط الإعلان التجاري؛ classic هو التخطيط الحالي للحفاظ على التوافق. */
+  commercialPosterTemplate?: CommercialPosterTemplate;
   visualTheme?: TemplateVisualTheme;
   showProductName: boolean;
   showHeadline: boolean;
@@ -483,10 +487,8 @@ export const DEFAULT_AD_DETAILS: AdDetails = {
   features: [],
   storeName: '',
   storePhone: '',
-  deliveryPhone: '',
   storeLocation: '',
   storeCategory: '',
-  storeCategories: [],
   marketingText: '',
   marketingPreferences: {
     tone: 'persuasive',
@@ -501,6 +503,7 @@ export const DEFAULT_AD_DETAILS: AdDetails = {
 
 export const DEFAULT_TEMPLATE_SETTINGS: TemplateSettings = {
   size: 'portrait',
+  commercialPosterTemplate: 'classic',
   visualTheme: 'classic',
   showProductName: true,
   showHeadline: true,
