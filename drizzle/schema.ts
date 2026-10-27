@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -109,3 +109,40 @@ export const projectAccessSettings = mysqlTable("project_access_settings", {
 });
 
 export type ProjectAccessSettings = typeof projectAccessSettings.$inferSelect;
+
+
+/**
+ * سجل عمليات الرصيد: كل شحن أو خصم أو استرجاع يُسجَّل هنا ولا يُعدَّل.
+ * العمود operationId فريد، فلا يمكن تنفيذ العملية نفسها مرتين حتى بعد إعادة تشغيل الخادم.
+ */
+export const creditTransactions = mysqlTable(
+  "credit_transactions",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    accessCodeId: int("accessCodeId").notNull(),
+    /** topup = شحن، charge = خصم لأداة ذكية، refund = استرجاع بعد فشل الأداة، adjust = تعديل يدوي */
+    kind: varchar("kind", { length: 16 }).notNull(),
+    tool: varchar("tool", { length: 64 }),
+    /** موجب = إضافة رصيد، سالب = خصم */
+    amount: int("amount").notNull(),
+    /** الرصيد المتبقي بعد العملية (-1 = غير محدود) */
+    balanceAfter: int("balanceAfter").notNull(),
+    operationId: varchar("operationId", { length: 96 }).unique(),
+    note: varchar("note", { length: 255 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("credit_transactions_accessCodeId_idx").on(table.accessCodeId)],
+);
+
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+/** أسعار الأدوات الذكية بالنقاط، قابلة للتعديل من لوحة المطور دون نشر جديد. */
+export const aiToolPrices = mysqlTable("ai_tool_prices", {
+  toolKey: varchar("toolKey", { length: 64 }).primaryKey(),
+  label: varchar("label", { length: 120 }),
+  cost: int("cost").notNull(),
+  enabled: int("enabled").default(1).notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiToolPrice = typeof aiToolPrices.$inferSelect;

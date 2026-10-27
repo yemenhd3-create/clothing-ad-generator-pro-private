@@ -64,6 +64,13 @@
       "when": 1788700000000,
       "tag": "0008_add_ai_quotas_and_usage_logs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788800000000,
+      "tag": "0009_simple_credit_wallet",
+      "breakpoints": true
     }
   ]
 }
