@@ -56,6 +56,21 @@ export function useDynamicAssets() {
     }
   };
 
+  const saveTemplateDirectly = async (template: DynamicTemplate): Promise<boolean> => {
+    setErrorNotice(null);
+    setSuccessNotice(null);
+    try {
+      await saveDynamicTemplate(template);
+      setActiveTemplate(template);
+      await refreshTemplates();
+      setSuccessNotice(`تم حفظ وتفعيل القالب "${template.name}" بنجاح في الجهاز`);
+      return true;
+    } catch (e) {
+      setErrorNotice(`فشل حفظ القالب محلياً: ${(e as Error).message}`);
+      return false;
+    }
+  };
+
   const removeTemplate = async (id: string): Promise<boolean> => {
     try {
       await deleteDynamicTemplate(id);
@@ -79,6 +94,7 @@ export function useDynamicAssets() {
     errorNotice,
     successNotice,
     saveJsonTemplate,
+    saveTemplateDirectly,
     removeTemplate,
     refreshTemplates,
     setErrorNotice,

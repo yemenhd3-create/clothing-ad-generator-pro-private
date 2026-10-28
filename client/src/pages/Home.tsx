@@ -33,6 +33,8 @@ import { buildDesignBenchmarks, createQualityFingerprint, detectDesignRegression
 import { createSuggestionFromMetrics } from '@/lib/localDesignIntelligence';
 import { prepareLocalAnalysis } from '@/lib/localAnalysisCache';
 import { clearPreferenceProfile, loadPreferenceProfile, recordLayoutPreference, setPreferenceEnabled } from '@/lib/localArtDirectorPreferences';
+import { useDynamicAssets } from '@/hooks/useDynamicAssets';
+import type { DynamicTemplate } from '@/lib/dynamicAssetManager';
 import { clearLocalBackgroundRemovalCache, prewarmLocalBackgroundRemoval, removeBackgroundLocally, type LocalRemovalStage } from '@/lib/localBackgroundRemoval';
 import { formatLocalFirstDownloadSize, formatLocalModelSize, getLocalRemovalUnavailableMessage } from '@/lib/localBackgroundRemovalSupport';
 import { createLocalToolSetupState, LOCAL_TOOL_READY_KEY, localToolSetupStateForStage, type LocalToolSetupState } from '@/lib/localRemovalSetup';
@@ -146,6 +148,7 @@ function isMainApplicationSection(value: ActiveView): value is MainApplicationSe
 }
 
 export default function Home({ friendTestMode = false }: { friendTestMode?: boolean }) {
+  const { templates: dynamicTemplates } = useDynamicAssets();
   const [currentStep, setCurrentStep] = useState<AdWorkflowStep>('upload');
   const [productImage, setProductImage] = useState('');
   const [adDetails, setAdDetails] = useState<AdDetails>(DEFAULT_AD_DETAILS);
@@ -1388,7 +1391,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   <div className="relative flex flex-1 flex-col" style={{ minHeight: 0 }} aria-label="القالب ثابت وأدوات عائمة" onPointerDown={handleWardrobeWorkspacePointerDown}>
                     <div className="flex items-center justify-between gap-2 px-1 pb-2"><button type="button" onClick={returnToImagePicker} className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-primary/15 bg-white px-2 text-[11px] font-black text-primary active:scale-95"><ArrowRight size={15} />صورة جديدة</button><span className="text-[11px] font-bold text-muted-foreground">اضغط أداة واحدة</span></div>
                     <div className="flex flex-1 items-center justify-center" style={{ minHeight: 0 }} aria-label="معاينة الإعلان داخل مساحة الهاتف"><img src={generatedAd} alt="معاينة قالب غرفة الملابس" className="mx-auto rounded-2xl border border-stone-100 bg-stone-50 object-contain shadow-sm" style={{ maxHeight: '100%', maxWidth: '100%', width: 'auto', height: 'auto' }} /></div>
-                    {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} settings={templateSettings} details={adDetails} savedMarketingPreferences={merchantProfile.marketingPreferences} disabled={isGenerating} isMarketingGenerating={marketingTextMutation.isPending} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onMarketingChange={handleMarketingDetailsChange} onGenerateMarketing={generateWardrobeMarketingText} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
+                    {activeWardrobeTool && <WardrobeToolPanel tool={activeWardrobeTool} dynamicTemplates={dynamicTemplates} settings={templateSettings} details={adDetails} savedMarketingPreferences={merchantProfile.marketingPreferences} disabled={isGenerating} isMarketingGenerating={marketingTextMutation.isPending} onClose={() => setActiveWardrobeTool(null)} onChange={handleStudioAppearanceChange} onMarketingChange={handleMarketingDetailsChange} onGenerateMarketing={generateWardrobeMarketingText} onScaleCommit={handleProductScaleCommit} onRefine={() => { setActiveWardrobeTool(null); setIsRefinementStudioOpen(true); }} />}
                     <WardrobeToolBar activeTool={activeWardrobeTool} onTool={tool => setActiveWardrobeTool(current => current === tool ? null : tool)} onDownload={handleDownload} onShareImage={() => void handleShareImageOnly()} onShareWhatsApp={() => void handleWhatsApp()} />
                   </div>
                 </div>
@@ -1502,14 +1505,107 @@ function WardrobeToolBar({ activeTool, onTool, onDownload, onShareImage, onShare
   return <div className="shrink-0 border-t border-primary/10 bg-white pt-2"><div className="flex gap-2 pb-1" dir="rtl" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>{tools.map(tool => <button key={tool.id} type="button" aria-pressed={activeTool === tool.id} onClick={() => onTool(tool.id)} className={`flex h-14 flex-col items-center justify-center gap-1 rounded-xl border text-xs font-black transition active:scale-95 ${activeTool === tool.id ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-primary/15 bg-white text-primary'}`} style={{ width: 62, flexShrink: 0, scrollSnapAlign: 'start', fontSize: 10 }}>{tool.icon}<span>{tool.label}</span></button>)}</div><div className="mt-2 grid grid-cols-3 gap-2"><button type="button" onClick={onDownload} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-primary/20 bg-white px-2 text-[11px] font-black text-primary transition active:scale-95"><Send size={15} />تنزيل</button><button type="button" onClick={onShareImage} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-primary/20 bg-white px-2 text-[11px] font-black text-primary transition active:scale-95"><Check size={15} />الصورة</button><button type="button" onClick={onShareWhatsApp} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl bg-primary px-2 text-[11px] font-black text-primary-foreground shadow-sm transition active:scale-95"><MessageCircle size={15} />واتساب</button></div></div>;
 }
 
-function WardrobeToolPanel({ tool, settings, details, savedMarketingPreferences, disabled, isMarketingGenerating, onClose, onChange, onMarketingChange, onGenerateMarketing, onScaleCommit, onRefine }: { tool: Exclude<WardrobeTool, null>; settings: TemplateSettings; details: AdDetails; savedMarketingPreferences?: Partial<MarketingTextPreferences>; disabled: boolean; isMarketingGenerating: boolean; onClose: () => void; onChange: (patch: StudioAppearancePatch) => void; onMarketingChange: (patch: Partial<AdDetails>) => void; onGenerateMarketing: (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => Promise<{ text: string; source: string; message?: string }>; onScaleCommit: (value: number) => void; onRefine: () => void }) {
+function WardrobeToolPanel({ tool, dynamicTemplates = [], settings, details, savedMarketingPreferences, disabled, isMarketingGenerating, onClose, onChange, onMarketingChange, onGenerateMarketing, onScaleCommit, onRefine }: { tool: Exclude<WardrobeTool, null>; dynamicTemplates?: DynamicTemplate[]; settings: TemplateSettings; details: AdDetails; savedMarketingPreferences?: Partial<MarketingTextPreferences>; disabled: boolean; isMarketingGenerating: boolean; onClose: () => void; onChange: (patch: StudioAppearancePatch) => void; onMarketingChange: (patch: Partial<AdDetails>) => void; onGenerateMarketing: (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => Promise<{ text: string; source: string; message?: string }>; onScaleCommit: (value: number) => void; onRefine: () => void }) {
   const backdrops: Array<{ id: NonNullable<TemplateSettings['productBackdrop']>; label: string }> = [{ id: 'soft', label: 'نظيف' }, { id: 'warm', label: 'دافئ' }, { id: 'cool', label: 'بارد' }, { id: 'spotlight', label: 'إضاءة' }, { id: 'rose', label: 'وردي' }, { id: 'sand', label: 'رملي' }];
   const shadows: Array<{ id: NonNullable<TemplateSettings['productShadow']>; label: string }> = [{ id: 'none', label: 'بلا ظل' }, { id: 'soft', label: 'ناعم' }, { id: 'grounded', label: 'أرضي' }];
   const [overlayLayer, setOverlayLayer] = useState<'caption' | 'price'>('caption');
   const currentScale = clampProductScale(settings.productScale);
   const title = tool === 'backdrop' ? 'خلفية القالب' : tool === 'templates' ? 'قوالب ملونة' : tool === 'shadow' ? 'عرض المنتج' : tool === 'size' ? 'حجم المنتج' : tool === 'format' ? 'مقاسات القالب' : tool === 'overlay' ? 'العنوان' : tool === 'marketing' ? 'نص تسويقي' : 'تعديل الصورة';
   const panelPosition = tool === 'overlay' && overlayLayer === 'price' ? { top: 44, left: 12, right: 12 } : { bottom: 96, left: 12, right: 12 };
-  return <section data-wardrobe-tool-panel className="absolute z-20 rounded-2xl border border-primary/15 bg-white p-2 shadow-xl" style={panelPosition} aria-label={title}><h3 className="mb-1 text-sm font-black text-primary">{title}</h3>{tool === 'backdrop' && <div className="grid grid-cols-3 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl border px-2 py-2 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'border-primary bg-primary text-primary-foreground' : 'border-primary/10 bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'templates' && <div><p className="mb-2 text-[11px] font-bold text-muted-foreground">اسحب واختر لوناً. لا يغيّر هذا القماش أو الصورة.</p><div className="flex gap-2 pb-1" dir="rtl" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>{WARDROBE_TEMPLATE_OPTIONS.map(item => <button key={item.id} type="button" disabled={disabled} aria-pressed={settings.productBackdrop === item.id} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl border p-1 text-center text-xs font-black ${settings.productBackdrop === item.id ? 'border-primary ring-1 ring-primary' : 'border-primary/15'}`} style={{ width: 74, flexShrink: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, ${item.colors[0]}, ${item.colors[1]})`, fontSize: 10 }}><span className="mx-auto block h-6 w-9 rounded-lg border" style={{ borderColor: 'rgba(255,255,255,.7)', backgroundColor: 'rgba(255,255,255,.35)' }} /><span className="mt-1 block text-primary">{item.label}</span><span className="block text-xs" style={{ color: 'rgba(57,34,124,.7)', fontSize: 9 }}>{item.category}</span></button>)}</div></div>}{tool === 'shadow' && <div><div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl border px-2 py-2 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'border-primary bg-primary text-primary-foreground' : 'border-primary/10 bg-secondary text-primary'}`}>{item.label}</button>)}</div><div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-secondary p-2"><span className="text-[11px] font-black text-primary">العرض</span><div className="grid grid-cols-3 gap-1"><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'flat' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'flat' ? 'bg-white text-primary shadow-sm' : 'text-muted-foreground'}`} style={{ fontSize: 10 }}>2D أصلي</button><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'lifted' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'lifted' ? 'bg-primary text-primary-foreground' : 'text-primary'}`} style={{ fontSize: 10 }}>2.5D مرتفع</button><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'platform' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'platform' ? 'bg-primary text-primary-foreground' : 'text-primary'}`} style={{ fontSize: 10 }}>منصة</button></div></div></div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'format' && <WardrobeSizePicker selected={settings.size} disabled={disabled} onSelect={size => onChange({ size })} />}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onLayerChange={setOverlayLayer} />}{tool === 'marketing' && <WardrobeMarketingTextTool details={details} savedPreferences={savedMarketingPreferences} disabled={disabled} isGenerating={isMarketingGenerating} onChange={onMarketingChange} onGenerate={onGenerateMarketing} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">عدّل الحواف فقط عند الحاجة، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-xl bg-primary px-2 text-[11px] font-black text-primary-foreground shadow-sm transition active:scale-95"><Wand2 size={17} />فتح التعديل</button></div>}</section>;
+  return <section data-wardrobe-tool-panel className="absolute z-20 rounded-2xl border border-primary/15 bg-white p-2 shadow-xl" style={panelPosition} aria-label={title}><h3 className="mb-1 text-sm font-black text-primary">{title}</h3>{tool === 'backdrop' && <div className="grid grid-cols-3 gap-2">{backdrops.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productBackdrop: item.id })} className={`rounded-xl border px-2 py-2 text-xs font-black ${(settings.productBackdrop || 'soft') === item.id ? 'border-primary bg-primary text-primary-foreground' : 'border-primary/10 bg-secondary text-primary'}`}>{item.label}</button>)}</div>}{tool === 'templates' && (
+  <div>
+    {dynamicTemplates.length > 0 && (
+      <div className="mb-3 border-b border-primary/10 pb-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-black text-primary flex items-center gap-1">
+            <Sparkles size={13} className="text-amber-500" /> قوالب واتساب المعتمدة
+          </span>
+          {settings.dynamicTemplateId && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange({
+                dynamicTemplateId: undefined,
+                customBackgroundImage: undefined,
+                dynamicProductSlot: undefined,
+              })}
+              className="text-[10px] font-bold text-red-600 hover:underline"
+            >
+              إلغاء القالب
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1" dir="rtl" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {dynamicTemplates.map(dyn => {
+            const isSelected = settings.dynamicTemplateId === dyn.id;
+            const productBox = dyn.elements.find(e => e.id === 'product')?.box;
+            return (
+              <button
+                key={dyn.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => onChange({
+                  size: 'square',
+                  dynamicTemplateId: dyn.id,
+                  customBackgroundImage: dyn.backgroundImage,
+                  dynamicProductSlot: productBox,
+                  smartGarmentTransform: undefined,
+                })}
+                className={`group relative shrink-0 rounded-xl border p-1 text-center transition active:scale-95 ${
+                  isSelected ? 'border-primary ring-2 ring-primary bg-primary/5' : 'border-primary/15 bg-white hover:border-primary/30'
+                }`}
+                style={{ width: 78 }}
+              >
+                {dyn.backgroundImage ? (
+                  <img
+                    src={dyn.backgroundImage}
+                    alt={dyn.name}
+                    className="h-11 w-full rounded-lg object-cover shadow-inner"
+                  />
+                ) : (
+                  <div className="h-11 w-full rounded-lg bg-primary/10 flex items-center justify-center text-[10px] text-primary font-black">
+                    1080×1080
+                  </div>
+                )}
+                <span className="mt-1 block truncate text-[10px] font-black text-foreground">
+                  {dyn.name}
+                </span>
+                <span className="block text-[8px] font-bold text-muted-foreground">
+                  {dyn.layoutPreset === 'split-left' ? 'القطعة يسار' : dyn.layoutPreset === 'split-right' ? 'القطعة يمين' : 'القطعة وسط'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    <p className="mb-2 text-[11px] font-bold text-muted-foreground">اسحب واختر لوناً. لا يغيّر هذا القماش أو الصورة.</p>
+    <div className="flex gap-2 pb-1" dir="rtl" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>
+      {WARDROBE_TEMPLATE_OPTIONS.map(item => (
+        <button
+          key={item.id}
+          type="button"
+          disabled={disabled}
+          aria-pressed={!settings.dynamicTemplateId && settings.productBackdrop === item.id}
+          onClick={() => onChange({
+            productBackdrop: item.id,
+            dynamicTemplateId: undefined,
+            customBackgroundImage: undefined,
+            dynamicProductSlot: undefined,
+          })}
+          className={`rounded-xl border p-1 text-center text-xs font-black ${
+            !settings.dynamicTemplateId && settings.productBackdrop === item.id ? 'border-primary ring-1 ring-primary' : 'border-primary/15'
+          }`}
+          style={{ width: 74, flexShrink: 0, scrollSnapAlign: 'start', background: `linear-gradient(145deg, ${item.colors[0]}, ${item.colors[1]})`, fontSize: 10 }}
+        >
+          <span className="mx-auto block h-6 w-9 rounded-lg border" style={{ borderColor: 'rgba(255,255,255,.7)', backgroundColor: 'rgba(255,255,255,.35)' }} />
+          <span className="mt-1 block text-primary">{item.label}</span>
+          <span className="block text-xs" style={{ color: 'rgba(57,34,124,.7)', fontSize: 9 }}>{item.category}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+)}{tool === 'shadow' && <div><div className="grid grid-cols-3 gap-2">{shadows.map(item => <button key={item.id} type="button" disabled={disabled} onClick={() => onChange({ productShadow: item.id })} className={`rounded-xl border px-2 py-2 text-xs font-black ${(settings.productShadow || 'grounded') === item.id ? 'border-primary bg-primary text-primary-foreground' : 'border-primary/10 bg-secondary text-primary'}`}>{item.label}</button>)}</div><div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-secondary p-2"><span className="text-[11px] font-black text-primary">العرض</span><div className="grid grid-cols-3 gap-1"><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'flat' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'flat' ? 'bg-white text-primary shadow-sm' : 'text-muted-foreground'}`} style={{ fontSize: 10 }}>2D أصلي</button><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'lifted' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'lifted' ? 'bg-primary text-primary-foreground' : 'text-primary'}`} style={{ fontSize: 10 }}>2.5D مرتفع</button><button type="button" disabled={disabled} onClick={() => onChange({ productPresentation: 'platform' })} className={`rounded-lg px-2 py-1 text-xs font-black ${(settings.productPresentation || 'flat') === 'platform' ? 'bg-primary text-primary-foreground' : 'text-primary'}`} style={{ fontSize: 10 }}>منصة</button></div></div></div>}{tool === 'size' && <div className="flex items-center gap-3"><button type="button" disabled={disabled || currentScale <= PRODUCT_SCALE_MIN} onClick={() => onScaleCommit(clampProductScale(currentScale - PRODUCT_SCALE_STEP))} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">أصغر</button><Slider value={[currentScale]} min={PRODUCT_SCALE_MIN} max={PRODUCT_SCALE_MAX} step={PRODUCT_SCALE_STEP} disabled={disabled} onValueCommit={values => onScaleCommit(clampProductScale(values[0]))} aria-label="حجم المنتج" /><button type="button" disabled={disabled || currentScale >= PRODUCT_SCALE_MAX} onClick={() => onScaleCommit(clampProductScale(currentScale + PRODUCT_SCALE_STEP))} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">أكبر</button></div>}{tool === 'format' && <WardrobeSizePicker selected={settings.size} disabled={disabled} onSelect={size => onChange({ size })} />}{tool === 'overlay' && <FloatingOverlayEditor settings={settings} disabled={disabled} onChange={onChange} onLayerChange={setOverlayLayer} />}{tool === 'marketing' && <WardrobeMarketingTextTool details={details} savedPreferences={savedMarketingPreferences} disabled={disabled} isGenerating={isMarketingGenerating} onChange={onMarketingChange} onGenerate={onGenerateMarketing} />}{tool === 'refine' && <div><p className="text-sm text-muted-foreground">عدّل الحواف فقط عند الحاجة، ثم عد إلى القالب.</p><button type="button" disabled={disabled} onClick={onRefine} className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1 rounded-xl bg-primary px-2 text-[11px] font-black text-primary-foreground shadow-sm transition active:scale-95"><Wand2 size={17} />فتح التعديل</button></div>}</section>;
 }
 
 function WardrobeSizePicker({ selected, disabled, onSelect }: { selected: TemplateSize; disabled: boolean; onSelect: (size: TemplateSize) => void }) {
@@ -1695,7 +1791,7 @@ function FloatingOverlayEditor({ settings, disabled, onChange, onLayerChange }: 
   return <div><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => selectLayer('caption')} className={`rounded-xl px-3 py-2 text-xs font-black ${isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>العنوان</button><button type="button" onClick={() => selectLayer('price')} className={`rounded-xl px-3 py-2 text-xs font-black ${!isCaption ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}>السعر</button></div><div className="relative"><input value={value} disabled={disabled} maxLength={isCaption ? 80 : 32} onFocus={() => setShowHint(false)} onChange={event => { setShowHint(false); onChange(isCaption ? { studioCaption: event.target.value } : { studioPrice: event.target.value }); }} placeholder={help.placeholder} className="mt-2 min-h-11 w-full rounded-xl border border-primary/10 px-3 text-sm text-foreground outline-none focus:border-primary" aria-label={isCaption ? 'عنوان الصورة' : 'سعر الصورة'} />{showHint && <span className="rounded-lg bg-primary/5 px-2 py-1 text-[10px] font-bold text-primary" style={{ pointerEvents: 'none', position: 'absolute', left: 8, right: 8, top: 12 }}>{help.hint}</span>}</div><div className="mt-2 flex items-center justify-between gap-2"><button type="button" disabled={disabled} onClick={() => setShowAppearance(current => !current)} className="rounded-xl bg-secondary px-3 py-2 text-xs font-black text-primary">ألوان</button><span className="text-[10px] font-bold text-muted-foreground">الأسهم تحركه مباشرة</span></div>{showAppearance && <div className="mt-2 grid grid-cols-2 gap-2"><ColorControl label="لون الخط" value={textColor} disabled={disabled} onChange={color => onChange(isCaption ? { studioCaptionTextColor: color } : { studioPriceTextColor: color })} /><BackgroundToggle active={Boolean(backgroundColor)} label="خلفية" disabled={disabled} onToggle={() => onChange(isCaption ? { studioCaptionBackgroundColor: backgroundColor ? '' : '#ff5757' } : { studioPriceBackgroundColor: backgroundColor ? '' : '#ffe600' })} /></div>}{showAppearance && backgroundColor && <ColorControl label="لون الخلفية" value={backgroundColor} disabled={disabled} onChange={color => onChange(isCaption ? { studioCaptionBackgroundColor: color } : { studioPriceBackgroundColor: color })} />}<div className="mx-auto mt-2 grid grid-cols-3 gap-2" style={{ width: 144 }}><span /><MoveButton label="أعلى" disabled={disabled} onClick={() => updatePosition(0, -.04)}><ArrowUp size={16} /></MoveButton><span /><MoveButton label="يمين" disabled={disabled} onClick={() => updatePosition(.04, 0)}><ArrowRight size={16} /></MoveButton><span /><MoveButton label="يسار" disabled={disabled} onClick={() => updatePosition(-.04, 0)}><ArrowLeft size={16} /></MoveButton><span /><MoveButton label="أسفل" disabled={disabled} onClick={() => updatePosition(0, .04)}><ArrowDown size={16} /></MoveButton><span /></div></div>;
 }
 
-type StudioAppearancePatch = Partial<Pick<TemplateSettings, 'size' | 'productBackdrop' | 'productShadow' | 'productPresentation' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioCaptionPosition' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor' | 'studioPricePosition'>>;
+type StudioAppearancePatch = Partial<Pick<TemplateSettings, 'size' | 'productBackdrop' | 'productShadow' | 'productPresentation' | 'studioCaption' | 'studioCaptionTextColor' | 'studioCaptionBackgroundColor' | 'studioCaptionPosition' | 'studioPrice' | 'studioPriceTextColor' | 'studioPriceBackgroundColor' | 'studioPricePosition' | 'dynamicTemplateId' | 'customBackgroundImage' | 'dynamicProductSlot' | 'smartGarmentTransform'>>;
 
 function StudioAppearanceControls({ settings, disabled, onChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void }) {
   const backdrops: Array<{ id: NonNullable<TemplateSettings['productBackdrop']>; label: string }> = [

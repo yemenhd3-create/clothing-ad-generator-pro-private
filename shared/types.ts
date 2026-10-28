@@ -276,6 +276,12 @@ export interface TemplateSettings {
   studioPricePosition?: StudioOverlayPosition;
   /** وضع غرفة الملابس: يرسم المنتج المفصول داخل خلفية كاملة بلا بيانات أو شارات أو طبقات إعلان. */
   wardrobeStudio?: boolean;
+  /** معرّف القالب الديناميكي الفعال من تخزين IndexedDB */
+  dynamicTemplateId?: string;
+  /** صورة خلفية مخصصة للقالب (Data URI) */
+  customBackgroundImage?: string;
+  /** موضع مخصص للمنتج في القالب الديناميكي لمنع التداخل */
+  dynamicProductSlot?: { x: number; y: number; width: number; height: number };
 }
 
 // ========== Store Settings ==========

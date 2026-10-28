@@ -9,6 +9,7 @@ import {
 } from './dynamicAssetStorage';
 
 export type DynamicAssetType = 'sticker' | 'badge' | 'font' | 'background';
+export type SmartLayoutPreset = 'split-left' | 'split-right' | 'centered';
 
 export interface DynamicAsset {
   id: string;
@@ -37,6 +38,8 @@ export interface DynamicTemplate {
   category?: string;
   createdAt: number;
   author?: string;
+  backgroundImage?: string;
+  layoutPreset?: SmartLayoutPreset;
 }
 
 export interface ValidationResult<T> {
@@ -154,6 +157,21 @@ export function validateDynamicTemplate(raw: unknown): ValidationResult<DynamicT
     return { valid: false, errors };
   }
 
+  // التحقق من صورة الخلفية (اختياري للقوالب الذكية)
+  let backgroundImage: string | undefined = undefined;
+  if (typeof obj.backgroundImage === 'string' && obj.backgroundImage.trim().length > 0) {
+    const bg = obj.backgroundImage.trim();
+    if (bg.startsWith('data:image/') || bg.startsWith('http://') || bg.startsWith('https://') || bg.startsWith('blob:')) {
+      backgroundImage = bg;
+    }
+  }
+
+  // التحقق من نمط التوزيع (اختياري)
+  let layoutPreset: SmartLayoutPreset | undefined = undefined;
+  if (typeof obj.layoutPreset === 'string' && ['split-left', 'split-right', 'centered'].includes(obj.layoutPreset)) {
+    layoutPreset = obj.layoutPreset as SmartLayoutPreset;
+  }
+
   // معالجة مقياس المنتج الاختياري
   let productScale: number | undefined = undefined;
   if (typeof obj.productScale === 'number' && Number.isFinite(obj.productScale)) {
@@ -171,6 +189,8 @@ export function validateDynamicTemplate(raw: unknown): ValidationResult<DynamicT
     category: typeof obj.category === 'string' ? obj.category.slice(0, 50) : undefined,
     createdAt: typeof obj.createdAt === 'number' ? obj.createdAt : Date.now(),
     author: typeof obj.author === 'string' ? obj.author.slice(0, 50) : 'device-user',
+    backgroundImage,
+    layoutPreset,
   };
 
   return { valid: true, data: sanitized, errors: [] };

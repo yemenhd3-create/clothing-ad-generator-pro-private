@@ -1,9 +1,13 @@
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Download,
+  ImagePlus,
   KeyRound,
+  Layers,
   LayoutTemplate,
   LockKeyhole,
   LogOut,
@@ -14,18 +18,22 @@ import {
   Save,
   ServerCog,
   Settings,
+  Sparkles,
   Sun,
   Trash2,
+  Upload,
 } from 'lucide-react';
+
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Input } from './ui/input';
-import { useDynamicAssets } from '@/hooks/useDynamicAssets';
+
 
 const DeveloperPersonalConsole = lazy(() => import('./DeveloperPersonalConsole'));
 const OpenImageModelsCatalog = lazy(() => import('./OpenImageModelsCatalog'));
 const PrivateKeyChat = lazy(() => import('./PrivateKeyChat'));
 const DeveloperProviderTools = lazy(() => import('./DeveloperProviderTools'));
+const DeveloperTemplateManager = lazy(() => import('./DeveloperTemplateManager'));
 
 type DiagnosticEntry = {
   id: string;
@@ -96,28 +104,6 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
     { id: 'workspace-opened', at: new Date().toLocaleTimeString('ar-YE'), level: 'info', message: 'تم فتح مساحة إدارة المطور.' },
   ]);
 
-  // Dynamic Assets Hook
-  const {
-    templates,
-    activeTemplate,
-    setActiveTemplate,
-    isLoading: isTemplatesLoading,
-    errorNotice: templateError,
-    successNotice: templateSuccess,
-    saveJsonTemplate,
-    removeTemplate,
-    setErrorNotice: setTemplateError,
-    setSuccessNotice: setTemplateSuccess,
-  } = useDynamicAssets();
-
-  const [jsonInput, setJsonInput] = useState<string>(DEFAULT_SAMPLE_TEMPLATE);
-
-  useEffect(() => {
-    if (activeTemplate) {
-      setJsonInput(JSON.stringify(activeTemplate, null, 2));
-    }
-  }, [activeTemplate]);
-
   const isAuthenticated = statusQuery.data?.authenticated === true;
 
   const addDiagnostic = (level: DiagnosticEntry['level'], message: string) => {
@@ -160,161 +146,7 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
     },
   });
 
-  const handleFormatJson = () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
-      setJsonInput(JSON.stringify(parsed, null, 2));
-      setTemplateSuccess('تم تنسيق كود JSON بنجاح');
-      setTemplateError(null);
-    } catch (e) {
-      setTemplateError(`فشل التنسيق: ${(e as Error).message}`);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    const success = await saveJsonTemplate(jsonInput);
-    if (success) {
-      addDiagnostic('success', 'تم حفظ وتفعيل قالب ديناميكي في IndexedDB');
-    } else {
-      addDiagnostic('error', 'فشل حفظ القالب الديناميكي');
-    }
-  };
-
-  const handleResetToSample = () => {
-    setJsonInput(DEFAULT_SAMPLE_TEMPLATE);
-    setTemplateSuccess('تمت استعادة النموذج الافتراضي');
-    setTemplateError(null);
-  };
-
-  const handleExportCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(jsonInput);
-      setTemplateSuccess('تم نسخ كود القالب إلى الحافظة بنجاح');
-      setTemplateError(null);
-    } catch {
-      setTemplateSuccess('تفضل بنسخ الكود من المنطقة النصية مباشرة');
-    }
-  };
-
-  const handleDeleteTemplate = async () => {
-    if (!activeTemplate) {
-      setTemplateError('يرجى اختيار قالب للحذف');
-      return;
-    }
-    await removeTemplate(activeTemplate.id);
-    setJsonInput(DEFAULT_SAMPLE_TEMPLATE);
-  };
-
-  // Template Editor View Component (Mobile-First, completely offline)
-  const renderTemplateEditor = () => (
-    <section className="space-y-4 rounded-[24px] bg-secondary p-4 shadow-[0_12px_30px_rgba(37,35,95,0.06)] sm:p-6" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/10 pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <LayoutTemplate className="text-primary" size={20} />
-            <h3 className="font-black text-foreground">محرر القوالب الديناميكي (Offline)</h3>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">عدّل أو استورد قوالب التصميم مباشرة على جهازك دون الحاجة لسيرفر أو بناء APK جديد.</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleFormatJson}
-          className="rounded-xl border border-primary/20 bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-primary/5 active:scale-95 transition"
-        >
-          تنسيق JSON
-        </button>
-      </div>
-
-      {templateError && (
-        <div className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700 border border-red-200">
-          <AlertTriangle className="mt-0.5 shrink-0 text-red-600" size={16} />
-          <span>{templateError}</span>
-        </div>
-      )}
-
-      {templateSuccess && (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-medium text-emerald-700 border border-emerald-200">
-          <Check className="shrink-0 text-emerald-600" size={16} />
-          <span>{templateSuccess}</span>
-        </div>
-      )}
-
-      {templates.length > 0 && (
-        <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-foreground">القوالب المحفوظة بالجهاز ({templates.length}):</label>
-          <div className="flex gap-2 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {templates.map(tpl => (
-              <button
-                key={tpl.id}
-                type="button"
-                onClick={() => {
-                  setActiveTemplate(tpl);
-                  setJsonInput(JSON.stringify(tpl, null, 2));
-                  setTemplateSuccess(`تم تحميل القالب "${tpl.name}"`);
-                  setTemplateError(null);
-                }}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition active:scale-95 ${
-                  activeTemplate?.id === tpl.id ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-card text-foreground border border-primary/10'
-                }`}
-              >
-                {tpl.name} ({tpl.size})
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-1.5">
-        <label className="block text-xs font-bold text-foreground">كود القالب (JSON Structure):</label>
-        <textarea
-          value={jsonInput}
-          onChange={e => setJsonInput(e.target.value)}
-          className="h-64 w-full rounded-2xl border border-primary/15 bg-slate-900 p-3.5 font-mono text-xs text-slate-100 shadow-inner focus:outline-none focus:ring-2 focus:ring-primary dir-ltr text-left"
-          placeholder="ضع كود JSON للقالب هنا..."
-          spellCheck={false}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-4">
-        <button
-          type="button"
-          onClick={handleSaveTemplate}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground shadow-sm transition active:scale-95"
-        >
-          <Save size={16} />
-          <span>حفظ وتفعيل</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleExportCopy}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-primary/15 bg-card px-3 text-xs font-bold text-foreground transition hover:bg-primary/5 active:scale-95"
-        >
-          <Copy size={16} />
-          <span>نسخ الكود</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleResetToSample}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-primary/15 bg-card px-3 text-xs font-bold text-foreground transition hover:bg-primary/5 active:scale-95"
-        >
-          <RotateCcw size={16} />
-          <span>نموذج افتراضي</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handleDeleteTemplate}
-          className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 active:scale-95"
-        >
-          <Trash2 size={16} />
-          <span>حذف القالب</span>
-        </button>
-      </div>
-    </section>
-  );
-
+  // If in 'templates' section, allow offline access even if not authenticated!
   // If in 'templates' section, allow offline access even if not authenticated!
   if (activeSection === 'templates') {
     return (
@@ -324,7 +156,7 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
               <Check size={13} /> وضع الأوفلاين
             </span>
-            <span className="text-sm font-black text-foreground">محرر القوالب الديناميكي</span>
+            <span className="text-sm font-black text-foreground">إدارة قوالب واتساب الذكية</span>
           </div>
           <button
             type="button"
@@ -335,14 +167,18 @@ export default function DeveloperWorkspace({ onBack }: { onBack: () => void }) {
           </button>
         </div>
         <div className="mt-3 flex-1 overflow-y-auto pb-3" style={{ minHeight: 0, overscrollBehavior: 'contain' }}>
-          {renderTemplateEditor()}
+          <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground font-bold">جارٍ تجهيز محرر القوالب...</div>}>
+            <DeveloperTemplateManager
+              addDiagnostic={addDiagnostic}
+              onBack={() => setActiveSection('overview')}
+            />
+          </Suspense>
         </div>
         <button type="button" onClick={onBack} className="shrink-0 w-full border-t border-primary/10 py-2 text-sm font-bold text-muted-foreground">العودة إلى الإنشاء</button>
       </section>
     );
   }
 
-  // Not authenticated view (Server login + Offline Template button)
   if (!isAuthenticated) {
     return (
       <section className="flex flex-col rounded-[26px] border border-primary/10 bg-white p-5 text-foreground shadow-[0_16px_40px_rgba(37,35,95,0.08)] sm:p-7" style={{ height: '100%', minHeight: 0, backgroundColor: 'var(--card)' }} dir="rtl" aria-label="مساحة دخول لوحة المطور">
