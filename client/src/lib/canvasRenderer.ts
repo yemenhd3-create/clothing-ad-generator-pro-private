@@ -1,3 +1,4 @@
+import type { AdCopyLayer } from '@shared/adCopyStudio';
 import { DEFAULT_PRODUCT_SCALE, PRODUCT_SCALE_MAX, PRODUCT_SCALE_MIN, type AdDetails, type ProductPresentationEffect, type ProductShadowPreset, type ProductStudioBackdrop, type TemplateBadgeType, type TemplateSettings, type TemplateSize } from '@shared/types';
 import { getArtworkTransform } from '@shared/artworkLayout';
 import { getDesignGeometry } from '@shared/designGeometry';
@@ -89,7 +90,7 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   }
 
   if (!studioOnly && !template.customBackgroundImage) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
-  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly);
+  await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', options.garmentTransform || template.smartGarmentTransform, template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly);
   if (studioOnly) drawWardrobeOverlays(ctx, template, layout);
   if (!studioOnly) {
     drawBadges(ctx, details, template, geometry.badge, layout, palette);
@@ -100,6 +101,9 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
     else if (template.showStoreInfo && (details.storeName.trim() || details.storePhone.trim())) drawFooter(ctx, details, geometry.footer, layout, palette);
   }
 
+    if (template.adCopyLayers && template.adCopyLayers.length > 0) {
+    drawAdCopyLayers(ctx, template.adCopyLayers, layout);
+  }
   const blob = await canvasToBlob(canvas, 'image/png', options.quality || 0.92);
   return URL.createObjectURL(blob);
 }
@@ -514,3 +518,25 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width:
 function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, centerX: number, topY: number, maxWidth: number, lineHeight: number, maxLines: number) { const words = text.split(/\s+/).filter(Boolean); let line = ''; let index = 0; for (const word of words) { const candidate = line ? `${line} ${word}` : word; if (ctx.measureText(candidate).width <= maxWidth || !line) { line = candidate; continue; } ctx.fillText(line, centerX, topY + index * lineHeight); index += 1; if (index >= maxLines) return; line = word; } if (line && index < maxLines) ctx.fillText(truncateToWidth(ctx, line, maxWidth), centerX, topY + index * lineHeight); }
 function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) { if (ctx.measureText(text).width <= maxWidth) return text; let value = text; while (value.length && ctx.measureText(`${value}…`).width > maxWidth) value = value.slice(0, -1); return `${value}…`; }
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> { return new Promise((resolve, reject) => canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('تعذر تصدير الإعلان كصورة'))), type, quality)); }
+
+function drawAdCopyLayers(ctx: CanvasRenderingContext2D, layers: AdCopyLayer[], layout: Layout) {
+  layers.filter(layer => layer.visible && layer.text.trim()).forEach(layer => {
+    ctx.save();
+    const x = Math.max(layout.width * .03, Math.min(layout.width * .97, layer.x * layout.width));
+    const y = Math.max(layout.height * .03, Math.min(layout.height * .97, layer.y * layout.height));
+    const size = Math.max(12, Math.round(layer.fontSize * layout.scale));
+    ctx.font = `${layer.weight} ${size}px ${layer.fontFamily || TEMPLATE_FONT_FAMILY}`;
+    ctx.fillStyle = layer.color || '#1e1b4b';
+    ctx.textAlign = layer.align || 'right';
+    ctx.textBaseline = 'middle';
+    
+    // شريط ظل خفيف لتحسين القراءة على أي خلفية
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.75)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    
+    ctx.fillText(layer.text.trim(), x, y);
+    ctx.restore();
+  });
+}
