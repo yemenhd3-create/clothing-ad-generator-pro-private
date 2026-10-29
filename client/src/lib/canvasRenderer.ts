@@ -32,9 +32,54 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
   const geometry = createGeometry(template.size, width, height);
   const palette = getTemplateTheme(template.visualTheme).palette;
   const studioOnly = isStudioOnly(details, template);
-  const hero = studioOnly ? createStudioHero(template.size, width, height) : geometry.hero;
-  if (studioOnly) drawWardrobeBackdrop(ctx, { x: 0, y: 0, width, height }, template.productBackdrop || 'soft', palette);
-  else { ctx.fillStyle = template.smartBackgroundColor || palette.background; ctx.fillRect(0, 0, width, height); }
+
+  // إذا تم تحديد موضع مخصص للمنتج من القالب الذكي، نضمن تمركزه وعدم تداخله مع النصوص
+  let hero = studioOnly ? createStudioHero(template.size, width, height) : geometry.hero;
+  if (template.dynamicProductSlot) {
+    const slot = template.dynamicProductSlot;
+    hero = {
+      x: width * slot.x,
+      y: height * slot.y,
+      width: width * slot.width,
+      height: height * slot.height,
+    };
+
+    if (slot.x < 0.45) {
+      // القطعة في الجانب الأيسر -> نوجّه النصوص والأسعار إلى الجانب الأيمن المحمي
+      const rightX = width * 0.52;
+      const rightW = width * 0.44;
+      geometry.header = { x: rightX, y: height * 0.10, width: rightW, height: height * 0.22 };
+      geometry.price = { x: rightX, y: height * 0.36, width: rightW, height: height * 0.22 };
+      geometry.info = { x: rightX, y: height * 0.60, width: rightW, height: height * 0.16 };
+      geometry.footer = { x: rightX, y: height * 0.78, width: rightW, height: height * 0.14 };
+      geometry.badge = { x: width * 0.05, y: height * 0.06, width: width * 0.14, height: height * 0.14 };
+    } else if (slot.x > 0.48) {
+      // القطعة في الجانب الأيمن -> نوجّه النصوص والأسعار إلى الجانب الأيسر المحمي
+      const leftX = width * 0.04;
+      const leftW = width * 0.44;
+      geometry.header = { x: leftX, y: height * 0.10, width: leftW, height: height * 0.22 };
+      geometry.price = { x: leftX, y: height * 0.36, width: leftW, height: height * 0.22 };
+      geometry.info = { x: leftX, y: height * 0.60, width: leftW, height: height * 0.16 };
+      geometry.footer = { x: leftX, y: height * 0.78, width: leftW, height: height * 0.14 };
+      geometry.badge = { x: width * 0.81, y: height * 0.06, width: width * 0.14, height: height * 0.14 };
+    }
+  }
+
+  // رسم خلفية القالب (صورة مخصصة أو تدرج لوني)
+  if (template.customBackgroundImage) {
+    try {
+      const bgImg = await loadImage(template.customBackgroundImage);
+      ctx.drawImage(bgImg, 0, 0, width, height);
+    } catch {
+      if (studioOnly) drawWardrobeBackdrop(ctx, { x: 0, y: 0, width, height }, template.productBackdrop || 'soft', palette);
+      else { ctx.fillStyle = template.smartBackgroundColor || palette.background; ctx.fillRect(0, 0, width, height); }
+    }
+  } else if (studioOnly) {
+    drawWardrobeBackdrop(ctx, { x: 0, y: 0, width, height }, template.productBackdrop || 'soft', palette);
+  } else {
+    ctx.fillStyle = template.smartBackgroundColor || palette.background;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const logoTransform = getArtworkTransform(template, 'logo');
   const footerTransform = getArtworkTransform(template, 'footer');
@@ -43,7 +88,7 @@ export async function renderAd(details: AdDetails, template: TemplateSettings, p
     if (template.showStoreLogo && template.storeLogoArtwork) await drawCircularLogo(ctx, template.storeLogoArtwork, toPixelBox(logoTransform, width, height));
   }
 
-  if (!studioOnly) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
+  if (!studioOnly && !template.customBackgroundImage) drawHeroBackdrop(ctx, hero, template.productBackdrop || 'auto', palette);
   await drawHero(ctx, productImageSrc, hero, options.visualMode || 'garment', studioOnly ? undefined : (options.garmentTransform || template.smartGarmentTransform), template.productScale, template.productShadow || 'soft', template.productPresentation || 'flat', studioOnly);
   if (studioOnly) drawWardrobeOverlays(ctx, template, layout);
   if (!studioOnly) {
