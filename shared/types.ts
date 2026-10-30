@@ -1,3 +1,4 @@
+import type { AdCopyLayer } from './adCopyStudio';
 /**
  * Core Types for Clothing Ad Generator
  * All types are shared between client and server
@@ -258,6 +259,8 @@ export interface TemplateSettings {
   smartTextColor?: string;
   /** تحويل اختياري للقطعة اعتمده المستخدم من اقتراح المصمم المحلي. */
   smartGarmentTransform?: GarmentDesignTransform;
+  /** طبقات نصوص الإعلان الذكية المعروضة فوق القالب */
+  adCopyLayers?: AdCopyLayer[];
   /** تكبير مرئي للقطعة داخل منطقتها الآمنة، من دون تغيير مكان السعر أو التذييل. */
   productScale?: number;
   productBackdrop?: ProductStudioBackdrop;
