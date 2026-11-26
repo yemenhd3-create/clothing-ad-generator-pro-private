@@ -1,3 +1,4 @@
+import { checkImageQuality } from '@/lib/imageQualityCheck';
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import type { AdDetails, AdWorkflowStep, DesignSuggestion, MarketingTextCampaign, MarketingTextEmphasis, MarketingTextLength, MarketingTextPreferences, ProductStudioBackdrop, StudioOverlayPosition, TemplateSettings, TemplateSize, TryOnResult } from '@shared/types';
@@ -352,6 +353,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
 
   const handleImageSelect = (imageUrl: string) => {
     tryOnRequestRef.current += 1;
+    void checkImageQuality(imageUrl).then(report => { if (report?.issues.length) toast.warning(report.messages[0], { duration: 7000 }); });
     setProductImage(imageUrl);
     setGeneratedAd('');
     setDesignPassport(null);
