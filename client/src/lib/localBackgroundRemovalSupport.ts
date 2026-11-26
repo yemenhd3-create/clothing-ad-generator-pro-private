@@ -50,3 +50,62 @@ export function normalizeU2NetMask(mask: ArrayLike<number>) {
   const range = max - min;
   return Uint8ClampedArray.from(mask, value => range <= 1e-8 ? 0 : Math.round(((value - min) / range) * 255));
 }
+
+/**
+ * يحسّن قناع U2NetP: يحذف البقع المنفصلة الصغيرة (قطع قريبة أو ظلال) ويُبقي الجسم
+ * الرئيسي، ثم يشدّ حافة الشفافية بمنحنى smoothstep ليقل الهالة حول القطعة.
+ * البقع التي تقل عن keepRatio من أكبر قطعة تُحذف؛ ما قارب حجم الأكبر يبقى (مثل كمّين منفصلين).
+ */
+export function refineU2NetMask(alpha: Uint8ClampedArray, size: number, keepRatio = 0.12): Uint8ClampedArray {
+  const total = size * size;
+  if (alpha.length !== total) return alpha;
+  const threshold = 128;
+  const label = new Int32Array(total);
+  const sizes: number[] = [0];
+  const stack = new Int32Array(total);
+  for (let start = 0; start < total; start += 1) {
+    if (alpha[start] < threshold || label[start] !== 0) continue;
+    const id = sizes.length;
+    let count = 0;
+    let top = 0;
+    stack[top++] = start;
+    label[start] = id;
+    while (top > 0) {
+      const current = stack[--top];
+      count += 1;
+      const x = current % size;
+      const y = (current - x) / size;
+      if (x > 0 && alpha[current - 1] >= threshold && label[current - 1] === 0) { label[current - 1] = id; stack[top++] = current - 1; }
+      if (x < size - 1 && alpha[current + 1] >= threshold && label[current + 1] === 0) { label[current + 1] = id; stack[top++] = current + 1; }
+      if (y > 0 && alpha[current - size] >= threshold && label[current - size] === 0) { label[current - size] = id; stack[top++] = current - size; }
+      if (y < size - 1 && alpha[current + size] >= threshold && label[current + size] === 0) { label[current + size] = id; stack[top++] = current + size; }
+    }
+    sizes.push(count);
+  }
+  const largest = Math.max(0, ...sizes);
+  if (largest === 0) return alpha;
+  const keep = sizes.map(count => count >= largest * keepRatio);
+  const refined = new Uint8ClampedArray(total);
+  for (let index = 0; index < total; index += 1) {
+    const value = alpha[index];
+    // البكسلات الضعيفة (أقل من 128) تبقى فقط إذا جاورت جسماً محفوظاً، لتبقى الحافة ناعمة.
+    let owner = label[index];
+    if (owner === 0 && value > 8) {
+      const x = index % size;
+      const y = (index - x) / size;
+      for (let dy = -2; dy <= 2 && owner === 0; dy += 1) {
+        for (let dx = -2; dx <= 2; dx += 1) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+          const neighbour = label[ny * size + nx];
+          if (neighbour !== 0 && keep[neighbour]) { owner = neighbour; break; }
+        }
+      }
+    }
+    if (owner === 0 || !keep[owner]) continue;
+    const t = Math.min(1, Math.max(0, (value / 255 - 0.2) / 0.6));
+    refined[index] = Math.round(t * t * (3 - 2 * t) * 255);
+  }
+  return refined;
+}

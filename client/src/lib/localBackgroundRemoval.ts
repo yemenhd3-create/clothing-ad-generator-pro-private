@@ -1,4 +1,4 @@
-import { LOCAL_BACKGROUND_MODEL_SIZE_BYTES, normalizeU2NetMask, withLocalRemovalTimeout } from './localBackgroundRemovalSupport';
+import { LOCAL_BACKGROUND_MODEL_SIZE_BYTES, normalizeU2NetMask, refineU2NetMask, withLocalRemovalTimeout } from './localBackgroundRemovalSupport';
 
 const LOCAL_MODEL_URL = '/local-runtime-assets/u2netp.onnx';
 const ORT_WASM_URL = '/local-runtime-assets/ort-wasm-simd-threaded.wasm';
@@ -74,7 +74,7 @@ export async function removeBackgroundLocally(sourceUrl: string, onStage?: (stag
   const output = await withLocalRemovalTimeout(session.run({ [session.inputNames[0]]: input }), INFERENCE_TIMEOUT_MS, 'INFERENCE_TIMEOUT');
   const inferenceMs = now() - inferenceStartedAt;
   const outputName = session.outputNames.includes('d0') ? 'd0' : session.outputNames[0];
-  const alphaValues = normalizeU2NetMask(output[outputName].data as Float32Array);
+  const alphaValues = refineU2NetMask(normalizeU2NetMask(output[outputName].data as Float32Array), INPUT_SIZE);
 
   onStage?.('finishing');
   const finishingStartedAt = now();
