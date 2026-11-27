@@ -452,6 +452,29 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     toast.success('تم مسح جلسة الإعلان. يمكنك بدء تصميم جديد الآن.');
   };
 
+  const startNewAdCopy = () => {
+    if (!window.confirm('ستُنشأ نسخة جديدة تحتفظ بصورة القطعة والبيانات وتستبدل نتيجة الإعلان الحالية. هل حفظت أو شاركت النتيجة الحالية؟')) return;
+    tryOnRequestRef.current += 1;
+    if (generatedAd.startsWith('blob:')) URL.revokeObjectURL(generatedAd);
+    setGeneratedAd('');
+    setDesignPassport(null);
+    setDesignContractReport(null);
+    setQualityGateReport(null);
+    setTemplateBeforeContractRepair(null);
+    setVisualRepairSnapshot(null);
+    setVisualRepairStatus('idle');
+    setDesignHistory(null);
+    setDesignRedoEntries([]);
+    removeFromStorage(StorageKeys.DESIGN_HISTORY);
+    setLastVisualSource('');
+    setTryOnResult({ status: 'idle', message: '' });
+    setDesignSuggestion(null);
+    setTemplateBeforeSuggestion(null);
+    setCurrentStep('details');
+    setActiveView('create');
+    toast.success('بدأنا نسخة جديدة بنفس الصورة والبيانات. عدّل ما تريد ثم ولّد الإعلان.');
+  };
+
   const resetDraftFields = () => {
     setAdDetails(EMPTY_AD_DETAILS);
     setHasRestoredDraft(false);
@@ -1469,7 +1492,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                 {designPassport && <DesignPassportCard passport={designPassport} onDownload={handleDownloadPassport} />}
                 {designContractReport && <DesignContractCard report={designContractReport} onApplyRepair={handleApplyContractRepair} historyEntries={(designHistory?.entries || []).map(entry => ({ id: entry.id, label: entry.label }))} historyFingerprint={designHistory ? designDocumentFingerprint(replayDesignHistory(designHistory)) : undefined} canUndoHistory={Boolean(designHistory?.entries.length)} canRedoHistory={Boolean(designRedoEntries.length)} onReplayHistory={handleReplayHistory} onUndoHistory={handleUndoHistory} onRedoHistory={handleRedoHistory} onRemoveHistoryEntry={handleRemoveHistoryEntry} />}
                 {qualityGateReport && <React.Suspense fallback={null}><DesignQualityGateCard report={qualityGateReport} onApplyRepair={handleApplyContractRepair} visualRepairStatus={visualRepairStatus} onUndoVisualRepair={visualRepairSnapshot ? handleUndoVisualRepair : undefined} /></React.Suspense>}
-                <React.Suspense fallback={<PageLoading label="جارٍ تجهيز خيارات المشاركة…" />}><SharePanel onDownload={handleDownload} onShare={handleShare} onWhatsApp={handleWhatsApp} onCopyText={handleCopyMarketingText} onQualityCheck={handleCreatePassport} onContractCheck={handleCheckDesignContract} onExportGateCheck={handleCheckQualityGate} isQualityChecking={isCreatingPassport} isContractChecking={isCheckingDesignContract} isExportGateChecking={isCheckingQualityGate} exportBlocked={qualityGateReport?.exportAllowed === false} onEdit={() => setCurrentStep('details')} onClear={clearAdSession} /></React.Suspense>
+                <React.Suspense fallback={<PageLoading label="جارٍ تجهيز خيارات المشاركة…" />}><SharePanel onDownload={handleDownload} onShare={handleShare} onWhatsApp={handleWhatsApp} onCopyText={handleCopyMarketingText} onQualityCheck={handleCreatePassport} onContractCheck={handleCheckDesignContract} onExportGateCheck={handleCheckQualityGate} isQualityChecking={isCreatingPassport} isContractChecking={isCheckingDesignContract} isExportGateChecking={isCheckingQualityGate} exportBlocked={qualityGateReport?.exportAllowed === false} onEdit={() => setCurrentStep('details')} onClear={clearAdSession} onNewCopy={startNewAdCopy} /></React.Suspense>
               </>
             )}
           </section>
