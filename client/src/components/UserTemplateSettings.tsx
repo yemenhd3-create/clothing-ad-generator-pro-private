@@ -1,6 +1,8 @@
 import type { ProductShadowPreset, ProductStudioBackdrop, TemplateBadgeType, TemplateSettings, TemplateSize, TemplateVisualTheme } from '@shared/types';
 import { TEMPLATE_THEME_LIST, getTemplateTheme } from '@shared/templateThemes';
 import type { MerchantProfile } from '@shared/merchantAssistant';
+import { toast } from 'sonner';
+import { SAVED_STORES_LIMIT, deleteSavedStore, loadSavedStores, saveSavedStore, type SavedStore } from '@/lib/savedStores';
 import {
   ArrowRight,
   Check,
@@ -22,6 +24,7 @@ import {
   Sun,
   Tag,
   Wrench,
+  X,
 } from 'lucide-react';
 import * as React from 'react';
 import { useState } from 'react';
@@ -232,9 +235,41 @@ export default function UserTemplateSettings({
     setPendingArtwork(null);
   };
 
+  const [savedStores, setSavedStores] = useState<SavedStore[]>(() => loadSavedStores());
+  const [appliedStoreId, setAppliedStoreId] = useState<string | null>(null);
   const updateProfile = (patch: Partial<MerchantProfile>) => {
     if (!profile || !onProfileChange) return;
     onProfileChange({ ...profile, ...patch, onboardingComplete: true, updatedAt: Date.now() });
+  };
+
+  const handleSaveStore = () => {
+    if (!profile) return;
+    const result = saveSavedStore(profile);
+    if (!result.store) return;
+    setSavedStores(result.stores);
+    setAppliedStoreId(result.store.id);
+    toast.success(result.created ? 'حفظنا بيانات هذا المتجر على هاتفك.' : 'حدّثنا بيانات المتجر المحفوظ.');
+  };
+
+  const handleApplyStore = (store: SavedStore) => {
+    updateProfile({
+      storeName: store.storeName,
+      storePhone: store.storePhone,
+      deliveryPhone: store.deliveryPhone,
+      storeLocation: store.storeLocation,
+      storeCategory: store.storeCategory,
+      storeCategories: store.storeCategories,
+      defaultDiscount: store.defaultDiscount,
+      defaultColors: store.defaultColors,
+    });
+    setAppliedStoreId(store.id);
+    toast.success(`طبّقنا بيانات «${store.storeName}» على الإعلان.`);
+  };
+
+  const handleDeleteStore = (store: SavedStore) => {
+    if (!window.confirm(`حذف المتجر المحفوظ «${store.storeName}» من هذا الهاتف؟`)) return;
+    setSavedStores(deleteSavedStore(store.id));
+    setAppliedStoreId(current => (current === store.id ? null : current));
   };
 
   const currentCategories = profile?.storeCategories && profile.storeCategories.length > 0
@@ -509,6 +544,58 @@ export default function UserTemplateSettings({
                     aria-label="الخصم الافتراضي"
                   />
                 </div>
+              </div>
+
+              {/* المتاجر المحفوظة للتبديل السريع بين المراكز */}
+              <div className="border-t border-stone-100 pt-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-foreground">متاجر محفوظة على هذا الهاتف</label>
+                  <button
+                    type="button"
+                    disabled={!profile.storeName.trim()}
+                    onClick={handleSaveStore}
+                    className="inline-flex items-center gap-1 rounded-xl border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-xs font-bold text-primary transition hover:bg-primary/10 active:scale-95 disabled:opacity-40"
+                  >
+                    <Plus size={13} /> حفظ هذا المتجر
+                  </button>
+                </div>
+                {savedStores.length === 0 ? (
+                  <p className="text-[11px] leading-5 text-muted-foreground">
+                    احفظ بيانات كل مركز تعمل له هنا، ثم بدّل بينها بضغطة واحدة (حتى {SAVED_STORES_LIMIT} متاجر).
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {savedStores.map(store => (
+                      <div
+                        key={store.id}
+                        className={`inline-flex items-center gap-0.5 rounded-xl border py-1 pe-1 ps-2.5 text-xs font-bold transition ${
+                          appliedStoreId === store.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-stone-200 bg-stone-50 text-foreground'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleApplyStore(store)}
+                          className="inline-flex items-center gap-1.5 transition active:scale-95"
+                          aria-label={`تطبيق بيانات ${store.storeName}`}
+                        >
+                          {appliedStoreId === store.id && <Check size={13} />}
+                          {store.storeName}
+                          {store.storeLocation ? <span className="text-[10px] font-medium text-muted-foreground">· {store.storeLocation}</span> : null}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStore(store)}
+                          className="rounded-full p-1 text-muted-foreground transition hover:text-red-600 active:scale-95"
+                          aria-label={`حذف ${store.storeName} من المحفوظة`}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -463,6 +463,7 @@ export enum StorageKeys {
   DESIGN_QUALITY_BASELINE = 'clothing_ad_design_quality_baseline_v1',
   MERCHANT_PROFILE = 'clothing_ad_merchant_profile_v1',
   MERCHANT_ASSISTANT_SESSION = 'clothing_ad_merchant_assistant_session_v1',
+  SAVED_STORES = 'clothing_ad_saved_stores_v1',
 }
 
 // ========== Constants ==========
