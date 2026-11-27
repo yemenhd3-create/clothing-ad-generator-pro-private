@@ -1,13 +1,14 @@
 import { PenLine, Sparkles } from 'lucide-react';
 import React, { useState } from 'react';
 import type { AdDetails } from '@shared/types';
+import { DEFAULT_MARKETING_TEXT_PREFERENCES } from '@shared/marketingText';
 import QuickMarketingCopyPanel from './QuickMarketingCopyPanel';
 
 const sampleDetails: AdDetails = {
-  productName: 'فستان سهرة أحمر', headline: '', discount: '', quantity: '', colors: [], price: '8500', currency: 'ريال',
-  features: [], storeName: '', storePhone: '777123456',
-  marketingText: 'فستان سهرة أحمر يلفت الأنظار ✨\nقطعة مختارة بعناية لإطلالة لا تُنسى.\n\nالسعر: 8500 ريال فقط\nللطلب والاستفسار واتساب: 777123456',
-  marketingTextEngine: 'local',
+  productName: '', headline: '', discount: '', quantity: '', colors: [], price: '', currency: 'ريال',
+  features: [], storeName: '', storePhone: '',
+  marketingText: '',
+  marketingPreferences: { ...DEFAULT_MARKETING_TEXT_PREFERENCES, customInstructions: 'فستان سهرة أحمر، السعر 8500 ريال، خصم 20% اليوم فقط، الطلب واتساب 777123456' },
 };
 
 /**

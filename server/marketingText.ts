@@ -3,6 +3,7 @@ import {
   buildWhatsAppSystemPrompt,
   buildWhatsAppUserPrompt,
   cleanForWhatsApp,
+  ensureAndroidSafeEmoji,
   formatMarketingTextForWhatsApp,
   generateLocalMarketingText,
   resolveMarketingTextPreferences,
@@ -211,7 +212,7 @@ export async function generateMarketingTextWithFallback(
         Math.min(MODEL_TIMEOUT_MS, remainingMs)
       );
       resetProviderCooldown(providerKey);
-      const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
+      const finalText = ensureAndroidSafeEmoji(formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences));
       return {
         text: finalText,
         source: 'cloud',
@@ -240,7 +241,7 @@ export async function generateMarketingTextWithFallback(
           variant,
           Math.min(MODEL_TIMEOUT_MS, remainingMs)
         );
-        const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
+        const finalText = ensureAndroidSafeEmoji(formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences));
         return {
           text: finalText,
           source: 'cloud',
@@ -265,7 +266,7 @@ export async function generateMarketingTextWithFallback(
           Math.min(MODEL_TIMEOUT_MS, deadline - Date.now())
         );
         resetProviderCooldown(geminiKey);
-        const finalText = formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences);
+        const finalText = ensureAndroidSafeEmoji(formatMarketingTextForWhatsApp(details, rawText, resolvedPreferences));
         return {
           text: finalText,
           source: 'cloud',

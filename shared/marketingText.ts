@@ -227,6 +227,29 @@ export function cleanForWhatsApp(text: string): string {
     .trim();
 }
 
+/** رموز تعبيرية قديمة مدعومة على هواتف أندرويد؛ غيرها قد يظهر كمربع فارغ. */
+const ANDROID_SAFE_EMOJI = new Set(['✨', '🤍', '🆕', '🛍', '🌙', '🎁', '🐑', '🎉', '🎊', '🔥', '🏷', '💡', '💰', '❤', '💛', '💚', '💙', '💜', '🧡', '👌', '👍', '😍', '🥰', '😊', '🤩', '💯', '✅', '⭐', '🌟', '🌸', '💐', '🎀', '🎈', '🛒', '💸', '📦', '🚚', '📱', '📞', '💬', '⚡', '🕌', '🌴']);
+
+/** نطاقات نقاط ترميز الرموز التعبيرية (بدون ميزة regex حديثة لتوافق البناء). */
+function isEmojiChar(char: string): boolean {
+  const cp = char.codePointAt(0) || 0;
+  return (cp >= 0x1F000 && cp <= 0x1FAFF) || (cp >= 0x2600 && cp <= 0x27BF) || (cp >= 0x2B00 && cp <= 0x2BFF) || cp === 0x3030 || cp === 0x303D || cp === 0x203C || cp === 0x2049;
+}
+
+/** يزيل أي رمز تعبيري قد يظهر كمربع فارغ على أندرويد ويبقي المجموعة الآمنة فقط. */
+export function ensureAndroidSafeEmoji(text: string): string {
+  let kept = '';
+  for (const char of text) {
+    if (isEmojiChar(char) && !ANDROID_SAFE_EMOJI.has(char)) continue;
+    kept += char;
+  }
+  return kept
+    .replace(/\u200D/g, '')   // أوصال ZWJ اليتيمة بعد حذف جزء من تسلسل مركب
+    .replace(/\u20E3/g, '')   // غلاف keycap اليتيم
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/ +$/gm, '');
+}
+
 export function validateMarketingText(text: string, input: { price?: string }): string[] {
   const errors: string[] = [];
   if (/\*\*|^#/m.test(text)) errors.push('markdown');
@@ -397,9 +420,9 @@ export function generateLocalMarketingText(
 
     const conciseBody = cleanForWhatsApp(conciseSections.join('\n'));
     const signature = buildWhatsAppSignature(details);
-    const fullText = preferences.format === 'whatsapp'
+    const fullText = ensureAndroidSafeEmoji(preferences.format === 'whatsapp'
       ? `${conciseBody}${signature}`
-      : sanitizeMarketingText(conciseBody);
+      : sanitizeMarketingText(conciseBody));
 
     return {
       text: fullText,
@@ -492,9 +515,9 @@ export function generateLocalMarketingText(
   // 9. التوقيع
   const signature = buildWhatsAppSignature(details);
 
-  const fullText = preferences.format === 'whatsapp'
+  const fullText = ensureAndroidSafeEmoji(preferences.format === 'whatsapp'
     ? `${mainBody}${signature}`
-    : sanitizeMarketingText(mainBody);
+    : sanitizeMarketingText(mainBody));
 
   return {
     text: fullText,

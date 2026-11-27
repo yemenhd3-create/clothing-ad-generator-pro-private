@@ -17,6 +17,7 @@ import {
 } from '@shared/adWorkflow';
 import { DEFAULT_MARKETING_TEXT_PREFERENCES, MARKETING_TEXT_CAMPAIGN_LABELS, MARKETING_TEXT_EMPHASIS_LABELS, generateLocalMarketingText, resolveMarketingTextPreferences } from '@shared/marketingText';
 import ImageUploader from '@/components/ImageUploader';
+import WardrobeMarketingTextTool from '@/components/WardrobeMarketingTextTool';
 import { TryOnOptIn, type TryOnSelection } from '@/components/TryOnOptIn';
 import LocalDesignSuggestionCard from '@/components/LocalDesignSuggestionCard';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
@@ -800,7 +801,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   };
 
   const generateQuickCopyText = async (variant: number) => {
-    const preferences = resolveMarketingTextPreferences({ ...DEFAULT_MARKETING_TEXT_PREFERENCES, ...merchantProfile.marketingPreferences });
+    const preferences = resolveMarketingTextPreferences({ ...DEFAULT_MARKETING_TEXT_PREFERENCES, ...merchantProfile.marketingPreferences, ...adDetails.marketingPreferences });
     const result = await generateWardrobeMarketingText(adDetails, preferences, variant);
     if (result.message) toast.message(result.message);
     else if (result.source === 'cloud') toast.success('حسّنا النص بأفضل نموذج متاح.');
@@ -1817,164 +1818,6 @@ function WardrobeSizePicker({ selected, disabled, onSelect }: { selected: Templa
   return <div><p className="mb-2 text-[11px] font-bold text-muted-foreground">اسحب الشريط يميناً أو شمالاً، ثم اختر نسبة واحدة للقالب.</p><div className="flex gap-2 pb-1" dir="rtl" aria-label="نسب مقاسات القالب" style={{ overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}>{WARDROBE_SIZE_OPTIONS.map(option => <button key={option.id} type="button" disabled={disabled} aria-pressed={selected === option.id} onClick={() => onSelect(option.id)} className={`rounded-xl px-4 py-3 text-center text-xs font-black ${selected === option.id ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`} style={{ minWidth: 88, flexShrink: 0, scrollSnapAlign: 'start' }}><span className="block text-base leading-none">{option.ratio}</span><span className="mt-1 block text-[10px]">{option.label}</span></button>)}</div></div>;
 }
 
-function WardrobeMarketingTextTool({ details, savedPreferences, disabled, isGenerating, onChange, onGenerate }: { details: AdDetails; savedPreferences?: Partial<MarketingTextPreferences>; disabled: boolean; isGenerating: boolean; onChange: (patch: Partial<AdDetails>) => void; onGenerate: (details: AdDetails, preferences: MarketingTextPreferences, variant: number) => Promise<{ text: string; source: string; message?: string }> }) {
-  const [variant, setVariant] = useState(0);
-  const [notice, setNotice] = useState('');
-  const [showOptions, setShowOptions] = useState(false);
-  const preferences = resolveMarketingTextPreferences({ ...DEFAULT_MARKETING_TEXT_PREFERENCES, ...details.marketingPreferences, ...savedPreferences });
-  const updatePreferences = (patch: Partial<MarketingTextPreferences>) => onChange({ marketingPreferences: { ...preferences, ...patch } });
-  const updateDetails = (patch: Partial<AdDetails>) => onChange(patch);
-  const generate = async () => {
-    const nextVariant = variant + 1;
-    setVariant(nextVariant);
-    const result = await onGenerate({ ...details, marketingPreferences: preferences }, preferences, nextVariant);
-    setNotice(`${result.message || 'الرسالة جاهزة.'} اضغط «واتساب + نص» أسفل القالب للإرسال.`);
-  };
-  const campaignOptions = Object.entries(MARKETING_TEXT_CAMPAIGN_LABELS) as Array<[MarketingTextCampaign, string]>;
-  const lengthOptions: Array<[MarketingTextLength, string]> = [['concise', 'مختصر'], ['short', 'أساسي'], ['medium', 'متوسط'], ['long', 'كبير']];
-  const emphasisOptions = Object.entries(MARKETING_TEXT_EMPHASIS_LABELS) as Array<[MarketingTextEmphasis, string]>;
-
-  return <div>
-    <p className="mb-2 text-[11px] font-bold text-muted-foreground">اكتب اسم القطعة والكمية فقط. بيانات المركز المحفوظة تدخل تلقائياً ولا تظهر داخل الصورة.</p>
-    <div className="grid grid-cols-2 gap-2">
-      <input value={details.productName} disabled={disabled} onChange={event => updateDetails({ productName: event.target.value })} placeholder="اسم القطعة" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="اسم القطعة للنص التسويقي" />
-      <input value={details.quantity} disabled={disabled} onChange={event => updateDetails({ quantity: event.target.value })} placeholder="الكمية (اختياري)" className="min-h-10 rounded-xl border border-primary/10 px-3 text-xs text-foreground outline-none focus:border-primary" aria-label="الكمية المتاحة" />
-    </div>
-    <div className="mt-2 grid grid-cols-2 gap-2">
-      <button type="button" disabled={disabled || isGenerating} onClick={() => void generate()} className="reference-primary w-full">{isGenerating ? <><LoaderCircle className="animate-spin" size={16} />جارٍ التجهيز…</> : <><MessageSquareText size={16} />جهّز النص</>}</button>
-      <button type="button" disabled={disabled} onClick={() => setShowOptions(value => !value)} className="reference-outline w-full"><SlidersHorizontal size={16} />خيارات</button>
-    </div>
-    {showOptions && (
-      <div className="mt-2.5 space-y-2.5 rounded-2xl border border-primary/15 bg-white p-3 shadow-sm" dir="rtl">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-muted-foreground">الحملة:</span>
-            <span className="font-black text-primary">{MARKETING_TEXT_CAMPAIGN_LABELS[preferences.campaign || 'professional']}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {campaignOptions.map(([id, label]) => {
-              const active = (preferences.campaign || 'professional') === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => updatePreferences({ campaign: id })}
-                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
-                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-muted-foreground">طول النص:</span>
-            <span className="font-black text-primary">{lengthOptions.find(([id]) => id === preferences.length)?.[1] || 'متوسط'}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {lengthOptions.map(([id, label]) => {
-              const active = preferences.length === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => updatePreferences({ length: id })}
-                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
-                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-muted-foreground">التنسيق:</span>
-            <span className="font-black text-primary">{MARKETING_TEXT_EMPHASIS_LABELS[preferences.emphasis || 'featured']}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {emphasisOptions.map(([id, label]) => {
-              const active = (preferences.emphasis || 'featured') === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => updatePreferences({ emphasis: id, format: 'whatsapp' })}
-                  className={`min-h-8 rounded-xl px-2.5 py-1 text-xs font-bold transition active:scale-95 ${
-                    active
-                      ? 'bg-primary text-primary-foreground shadow-sm ring-1 ring-primary'
-                      : 'bg-secondary/60 text-foreground ring-1 ring-stone-200/90 hover:bg-secondary'
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 border-t border-primary/10 pt-2">
-          <input
-            value={details.price}
-            disabled={disabled}
-            inputMode="numeric"
-            onChange={event => updateDetails({ price: event.target.value, currency: details.currency || 'ريال' })}
-            placeholder="السعر"
-            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
-            aria-label="السعر للنص التسويقي"
-          />
-          <input
-            value={details.discount}
-            disabled={disabled}
-            inputMode="decimal"
-            onChange={event => updateDetails({ discount: event.target.value })}
-            placeholder="الخصم %"
-            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
-            aria-label="الخصم"
-          />
-          <input
-            value={details.storePhone}
-            disabled={disabled}
-            inputMode="tel"
-            onChange={event => updateDetails({ storePhone: event.target.value })}
-            placeholder="رقم الهاتف"
-            className="min-h-9 min-w-0 rounded-lg border border-primary/10 px-2 text-center text-xs text-foreground outline-none focus:border-primary"
-            aria-label="رقم التوصيل وواتساب"
-          />
-        </div>
-
-        <div className="space-y-1.5 border-t border-primary/10 pt-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-muted-foreground">تعليمات خاصة (اختياري):</span>
-          </div>
-          <input
-            value={preferences.customInstructions || ''}
-            disabled={disabled}
-            onChange={event => updatePreferences({ customInstructions: event.target.value })}
-            placeholder="مثال: ركّز على خامة الصيف، أو عرض حبتين"
-            className="min-h-9 w-full rounded-lg border border-primary/10 px-2 text-xs text-foreground outline-none focus:border-primary"
-            aria-label="تعليمات إضافية للنص التسويقي"
-          />
-        </div>
-      </div>
-    )}
-    {notice && <p className="mt-2 text-[10px] leading-4 text-muted-foreground" aria-live="polite">{notice}</p>}
-  </div>;
-}
 
 function FloatingOverlayEditor({ settings, disabled, onChange, onLayerChange }: { settings: TemplateSettings; disabled: boolean; onChange: (patch: StudioAppearancePatch) => void; onLayerChange: (layer: 'caption' | 'price') => void }) {
   const [layer, setLayer] = useState<'caption' | 'price'>('caption');
