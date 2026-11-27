@@ -6,6 +6,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
 const DeveloperConfirmVisualCheck = lazy(() => import('./components/DeveloperConfirmVisualCheck'));
+const LoginGateToggleVisualCheck = lazy(() => import('./components/LoginGateToggleVisualCheck'));
 const AdDetailsFormVisualCheck = lazy(() => import('./components/AdDetailsFormVisualCheck'));
 const SharePanelVisualCheck = lazy(() => import('./components/SharePanelVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
@@ -33,6 +34,9 @@ function PersonalHome() {
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('developer-confirm-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة التأكيد…" />}><DeveloperConfirmVisualCheck /></Suspense>;
+  }
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('login-gate-toggle-check')) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة المفتاح…" />}><LoginGateToggleVisualCheck /></Suspense>;
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('ad-details-form-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة النموذج…" />}><AdDetailsFormVisualCheck /></Suspense>;
