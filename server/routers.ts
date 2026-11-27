@@ -6,6 +6,7 @@ import { developerProcedure, protectedProcedure, publicProcedure, router } from 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { authenticateDeveloper } from "./developerAuth";
+import { clientKeyFromRequest, developerLoginLimiter } from "./developerLoginLimiter";
 import { DEVELOPER_SESSION_COOKIE, DEVELOPER_SESSION_MAX_AGE_MS, isDeveloperSession, issueDeveloperSession } from './developerSession';
 import { checkDeveloperProvider, deleteDeveloperProvider, listDeveloperProviders, saveDeveloperProvider, verifyConnectedLeaderProvider } from './developerProviders';
 import { getActiveProviderCooldowns, resetProviderCooldown, clearAllProviderCooldowns } from './aiProviderErrors';
@@ -63,9 +64,16 @@ export const appRouter = router({
     login: publicProcedure
       .input(z.object({ username: z.string().min(1), password: z.string().min(1) }))
       .mutation(({ ctx, input }) => {
+        const clientKey = clientKeyFromRequest(ctx.req);
+        const waitSeconds = developerLoginLimiter.retryAfterSeconds(clientKey);
+        if (waitSeconds > 0) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `محاولات كثيرة خاطئة. انتظر ${Math.ceil(waitSeconds / 60)} دقيقة ثم أعد المحاولة.` });
+        }
         if (!authenticateDeveloper(input.username, input.password)) {
+          developerLoginLimiter.recordFailure(clientKey);
           throw new TRPCError({ code: "UNAUTHORIZED", message: "بيانات المطور غير صحيحة" });
         }
+        developerLoginLimiter.recordSuccess(clientKey);
         const sessionToken = issueDeveloperSession();
         ctx.res.cookie(DEVELOPER_SESSION_COOKIE, sessionToken, {
           ...getSessionCookieOptions(ctx.req),
