@@ -1,6 +1,7 @@
 import type { AdDetails } from '@shared/types';
 import React, { useEffect, useState } from 'react';
 import AdDetailsForm from './AdDetailsForm';
+import StepHelpHint from './StepHelpHint';
 
 const emptyDetails = (): AdDetails => ({
   productName: '',
@@ -40,6 +41,7 @@ export default function AdDetailsFormVisualCheck() {
       <p className="mb-3 rounded-xl bg-white p-3 text-sm font-bold text-stone-700 shadow-sm">
         معاينة رقائق آخر المدخلات في نموذج بيانات الإعلان (وضع تطويري).
       </p>
+      <StepHelpHint step="details" />
       <div className="rounded-[24px] bg-white p-4 shadow-sm">
         <AdDetailsForm details={details} onChange={setDetails} />
       </div>
