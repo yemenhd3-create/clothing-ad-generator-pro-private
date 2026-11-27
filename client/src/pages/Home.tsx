@@ -76,6 +76,7 @@ import {
   Maximize2,
   Wand2,
   LayoutTemplate,
+  X,
 } from 'lucide-react';
 
 const EMBEDDED_ANDROID_APP = import.meta.env.VITE_EMBEDDED_ANDROID_APP === 'true';
@@ -165,6 +166,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const [tryOnPreview, setTryOnPreview] = useState<TryOnResult | null>(null);
   const [isTryOnRunning, setIsTryOnRunning] = useState(false);
   const tryOnRequestRef = React.useRef(0);
+  const generationTicketRef = React.useRef(0);
   const studioRenderRequestRef = React.useRef(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReviewingImage, setIsReviewingImage] = useState(false);
@@ -500,6 +502,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       return;
     }
 
+    const ticket = ++generationTicketRef.current;
     setCurrentStep('final');
     setIsGenerating(true);
     setGeneratedAd('');
@@ -526,6 +529,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
           15_000,
           'انتهت مهلة إنشاء الإعلان. أعد المحاولة أو استخدم الصورة الأصلية.'
         );
+        if (ticket !== generationTicketRef.current) return;
         setGeneratedAd(output);
         setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(adDetails));
         if (WARDROBE_ROOM_MODE) {
@@ -535,11 +539,13 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         const document = compileDesignDocument(adDetails, templateSettings, designSuggestion);
         const contract = evaluateDesignContract(document);
         const pixelTruth = await inspectRenderedPixelTruth(output, document);
+        if (ticket !== generationTicketRef.current) return;
         setDesignContractReport(contract);
         setQualityGateReport(evaluateDesignQuality(document, contract, adDetails, designBenchmarks.find(item => item.template === templateSettings.size), pixelTruth));
         setIsGenerating(false);
         return;
       } catch (error) {
+        if (ticket !== generationTicketRef.current) return;
         setTryOnResult({ status: 'fallback', message: error instanceof Error ? `تعذر استخدام نتيجة التلبيس؛ أبقينا صورة القطعة المحلية. ${error.message}` : 'تعذر استخدام نتيجة التلبيس؛ أبقينا صورة القطعة المحلية.' });
         setLastVisualSource('');
       }
@@ -548,14 +554,17 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     let localImage;
     try {
       localImage = await removeBackgroundLocally(sourceImage, stage => {
+        if (ticket !== generationTicketRef.current) return;
         setTryOnResult({ status: 'processing', message: getLocalStageMessage(stage) });
       });
     } catch (error) {
+      if (ticket !== generationTicketRef.current) return;
       console.error('Failed to prepare local image:', error);
       setTryOnResult({ status: 'unavailable', message: getLocalRemovalUnavailableMessage(error) });
       setIsGenerating(false);
       return;
     }
+    if (ticket !== generationTicketRef.current) return;
 
     try {
       const fullHeightSubject = shouldPreserveFullHeight(localImage);
@@ -577,22 +586,27 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
         'انتهت مهلة إنشاء الإعلان. جرّب صورة أصغر أو أعد المحاولة.'
       );
 
+      if (ticket !== generationTicketRef.current) return;
       setGeneratedAd(output);
       setMarketingText(WARDROBE_ROOM_MODE ? '' : buildMarketingText(adDetails));
       if (WARDROBE_ROOM_MODE) return;
       const document = compileDesignDocument(adDetails, templateSettings, designSuggestion);
       const contract = evaluateDesignContract(document);
       const pixelTruth = await inspectRenderedPixelTruth(output, document);
+      if (ticket !== generationTicketRef.current) return;
       setDesignContractReport(contract);
       setQualityGateReport(evaluateDesignQuality(document, contract, adDetails, designBenchmarks.find(item => item.template === templateSettings.size), pixelTruth));
     } catch (error) {
+      if (ticket !== generationTicketRef.current) return;
       console.error('Failed to render local advertisement:', error);
       setTryOnResult({
         status: 'unavailable',
         message: error instanceof Error ? error.message : 'تعذّر إنشاء الإعلان محلياً. جرّب صورة أصغر ثم أعد المحاولة.',
       });
     } finally {
-      setIsGenerating(false);
+      if (ticket === generationTicketRef.current) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -768,6 +782,19 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setIsReviewingImage(false);
     setActiveWardrobeTool(null);
     setCurrentStep('upload');
+  };
+
+  /** يلغي تجهيز الإعلان الجاري: تحرر الواجهة فوراً وتُهمل نتيجة الحساب عند وصولها لاحقاً. */
+  const cancelGeneration = () => {
+    generationTicketRef.current += 1;
+    setIsGenerating(false);
+    setTryOnResult({ status: 'idle', message: '' });
+    if (WARDROBE_ROOM_MODE) {
+      returnToImagePicker();
+    } else {
+      setCurrentStep(productImage ? 'details' : 'upload');
+    }
+    toast.message('ألغينا تجهيز الإعلان. بقيت صورتك وبياناتك كما هي.');
   };
 
   const persistMerchantProfile = (profile: MerchantProfile, announce: boolean) => {
@@ -1386,6 +1413,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   </div>
                   <h3 className="text-lg font-black text-foreground">جارٍ توليد الإعلان</h3>
                   <p className="mt-2 max-w-xs text-sm leading-6 text-muted-foreground" aria-live="polite">{tryOnResult.message || 'نرتب القالب ونجهز الصورة. لا تغلق الصفحة الآن.'}</p>
+                  <button type="button" onClick={cancelGeneration} className="mt-5 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-white px-4 py-2 text-sm font-bold text-primary shadow-sm transition active:scale-95"><X size={16} />إلغاء والرجوع</button>
                 </div>
               )}
 
