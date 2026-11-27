@@ -63,6 +63,11 @@ export default function PersonalAccessGate({ children }: { children: ReactNode }
     return <AccessShell icon={<LockKeyhole className="animate-pulse" size={28} />} title="جارٍ فتح مساحتك الشخصية" description="نتحقق من حسابك وإعدادات الوصول بأمان." />;
   }
 
+  // بوابة الدخول متوقفة من لوحة المطور: أي شخص معه الرابط يدخل مباشرة دون رمز.
+  if (modeQuery.data?.loginRequired === false) {
+    return <>{children}</>;
+  }
+
   if (!isOnline && !offlineLeaseValid) {
     return <AccessShell icon={<Wifi size={28} />} title="انتهت مدة العمل دون اتصال" description="افتح الإنترنت للتحقق من صلاحية الحساب وتجديد مدة العمل المحلي. لن تُحذف الصور أو الإعدادات المحفوظة على هذا الجهاز." action={<button type="button" onClick={() => window.location.reload()} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-5 text-base font-black text-primary-foreground"><Wifi size={19} />إعادة التحقق</button>} />;
   }
