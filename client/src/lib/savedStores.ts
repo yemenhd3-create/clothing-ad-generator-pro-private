@@ -14,7 +14,16 @@ export type SavedStore = {
   storeCategories: string[];
   defaultDiscount: string;
   defaultColors: string[];
+  /** شعار المتجر (Data URI). غائب في السجلات المحفوظة قبل دعم الهوية البصرية، وفارغ عند الحفظ بلا شعار. */
+  storeLogoArtwork?: string;
+  /** تذييل المتجر (Data URI). غائب في السجلات القديمة، وفارغ عند الحفظ بلا تذييل. */
+  footerArtwork?: string;
   updatedAt: number;
+};
+
+export type SavedStoreArtwork = {
+  storeLogoArtwork?: string;
+  footerArtwork?: string;
 };
 
 export type SaveStoreResult = {
@@ -37,6 +46,17 @@ function cleanColors(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0).slice(0, 6);
 }
 
+const ARTWORK_MAX_CHARS = 400_000;
+
+/** يبقي صور Data URIs فقط؛ يعيد undefined للقيمة الغائبة أو غير الصالحة حتى لا تُمحى هوية السجلات القديمة عند التطبيق. */
+function cleanArtwork(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('data:image/')) return undefined;
+  return trimmed.slice(0, ARTWORK_MAX_CHARS);
+}
+
 function normalizeSavedStore(value: unknown): SavedStore | null {
   if (!value || typeof value !== 'object') return null;
   const source = value as Record<string, unknown>;
@@ -52,6 +72,8 @@ function normalizeSavedStore(value: unknown): SavedStore | null {
     storeCategories: cleanList(source.storeCategories),
     defaultDiscount: cleanText(source.defaultDiscount, 16),
     defaultColors: cleanColors(source.defaultColors),
+    storeLogoArtwork: cleanArtwork(source.storeLogoArtwork),
+    footerArtwork: cleanArtwork(source.footerArtwork),
     updatedAt: typeof source.updatedAt === 'number' && Number.isFinite(source.updatedAt) ? source.updatedAt : 0,
   };
 }
@@ -72,7 +94,7 @@ function persist(stores: SavedStore[]): SavedStore[] {
   return next;
 }
 
-export function saveSavedStore(profile: MerchantProfile): SaveStoreResult {
+export function saveSavedStore(profile: MerchantProfile, artwork: SavedStoreArtwork = {}): SaveStoreResult {
   const storeName = cleanText(profile.storeName);
   const stores = loadSavedStores();
   if (!storeName) return { stores, store: null, created: false };
@@ -87,6 +109,8 @@ export function saveSavedStore(profile: MerchantProfile): SaveStoreResult {
     storeCategories: cleanList(profile.storeCategories),
     defaultDiscount: cleanText(profile.defaultDiscount, 16),
     defaultColors: cleanColors(profile.defaultColors),
+    storeLogoArtwork: cleanArtwork(artwork.storeLogoArtwork) ?? '',
+    footerArtwork: cleanArtwork(artwork.footerArtwork) ?? '',
     updatedAt: Date.now(),
   };
   return { stores: persist([store, ...stores.filter(entry => entry.id !== store.id)]), store, created: !existing };
