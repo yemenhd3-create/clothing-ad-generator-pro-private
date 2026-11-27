@@ -24,7 +24,7 @@ jobs:
       JWT_SECRET: ci-only-test-secret-please-do-not-use-in-production-2026
     steps:
       - name: جلب النسخة
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: إعداد pnpm
         uses: pnpm/action-setup@v4
