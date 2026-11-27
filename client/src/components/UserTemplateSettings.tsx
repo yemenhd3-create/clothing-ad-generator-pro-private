@@ -3,6 +3,7 @@ import { TEMPLATE_THEME_LIST, getTemplateTheme } from '@shared/templateThemes';
 import type { MerchantProfile } from '@shared/merchantAssistant';
 import { toast } from 'sonner';
 import { SAVED_STORES_LIMIT, deleteSavedStore, loadSavedStores, saveSavedStore, type SavedStore } from '@/lib/savedStores';
+import { prepareStoreArtwork } from '@/lib/storeArtwork';
 import {
   ArrowRight,
   Check,
@@ -242,13 +243,17 @@ export default function UserTemplateSettings({
     onProfileChange({ ...profile, ...patch, onboardingComplete: true, updatedAt: Date.now() });
   };
 
-  const handleSaveStore = () => {
+  const handleSaveStore = async () => {
     if (!profile) return;
-    const result = saveSavedStore(profile);
+    const [storeLogoArtwork, footerArtwork] = await Promise.all([
+      settings.storeLogoArtwork ? prepareStoreArtwork(settings.storeLogoArtwork, 'logo') : Promise.resolve(''),
+      settings.footerArtwork ? prepareStoreArtwork(settings.footerArtwork, 'footer') : Promise.resolve(''),
+    ]);
+    const result = saveSavedStore(profile, { storeLogoArtwork, footerArtwork });
     if (!result.store) return;
     setSavedStores(result.stores);
     setAppliedStoreId(result.store.id);
-    toast.success(result.created ? 'حفظنا بيانات هذا المتجر على هاتفك.' : 'حدّثنا بيانات المتجر المحفوظ.');
+    toast.success(result.created ? 'حفظنا بيانات هذا المتجر مع شعاره وتذييله على هاتفك.' : 'حدّثنا بيانات المتجر المحفوظ مع شعاره وتذييله.');
   };
 
   const handleApplyStore = (store: SavedStore) => {
@@ -262,8 +267,20 @@ export default function UserTemplateSettings({
       defaultDiscount: store.defaultDiscount,
       defaultColors: store.defaultColors,
     });
+    // السجلات المحفوظة قبل دعم الهوية البصرية لا تحمل حقول الشعار والتذييل؛ نترك صور الإعدادات الحالية كما هي لها فقط.
+    const artworkPatch: Partial<TemplateSettings> = {};
+    if (store.storeLogoArtwork !== undefined) {
+      artworkPatch.storeLogoArtwork = store.storeLogoArtwork;
+      artworkPatch.showStoreLogo = Boolean(store.storeLogoArtwork);
+    }
+    if (store.footerArtwork !== undefined) {
+      artworkPatch.footerArtwork = store.footerArtwork;
+      artworkPatch.showFooterArtwork = Boolean(store.footerArtwork);
+    }
+    const hasArtwork = Object.keys(artworkPatch).length > 0;
+    if (hasArtwork) updateSettings({ ...settings, ...artworkPatch });
     setAppliedStoreId(store.id);
-    toast.success(`طبّقنا بيانات «${store.storeName}» على الإعلان.`);
+    toast.success(hasArtwork ? `طبّقنا بيانات «${store.storeName}» مع شعاره وتذييله على الإعلان.` : `طبّقنا بيانات «${store.storeName}» على الإعلان.`);
   };
 
   const handleDeleteStore = (store: SavedStore) => {
@@ -561,7 +578,7 @@ export default function UserTemplateSettings({
                 </div>
                 {savedStores.length === 0 ? (
                   <p className="text-[11px] leading-5 text-muted-foreground">
-                    احفظ بيانات كل مركز تعمل له هنا، ثم بدّل بينها بضغطة واحدة (حتى {SAVED_STORES_LIMIT} متاجر).
+                    احفظ بيانات كل مركز تعمل له هنا مع شعاره وتذييله، ثم بدّل بينها بضغطة واحدة (حتى {SAVED_STORES_LIMIT} متاجر).
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
@@ -581,6 +598,9 @@ export default function UserTemplateSettings({
                           aria-label={`تطبيق بيانات ${store.storeName}`}
                         >
                           {appliedStoreId === store.id && <Check size={13} />}
+                          {store.storeLogoArtwork ? (
+                            <img src={store.storeLogoArtwork} alt="" className="h-5 w-5 rounded-full border border-white bg-white object-cover shadow-sm" />
+                          ) : null}
                           {store.storeName}
                           {store.storeLocation ? <span className="text-[10px] font-medium text-muted-foreground">· {store.storeLocation}</span> : null}
                         </button>

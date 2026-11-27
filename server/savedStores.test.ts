@@ -60,4 +60,43 @@ describe('المتاجر المحفوظة محلياً', () => {
     expect(remaining.map(store => store.storeName)).toEqual(['الثاني']);
     expect(loadSavedStores().map(store => store.storeName)).toEqual(['الثاني']);
   });
+
+  it('يحفظ الشعار والتذييل مع المتجر ويستعيدهما', () => {
+    const logo = 'data:image/webp;base64,LOGO';
+    const footer = 'data:image/webp;base64,FOOTER';
+    const result = saveSavedStore(profileWith({ storeName: 'شي إن التربة' }), { storeLogoArtwork: logo, footerArtwork: footer });
+    expect(result.store?.storeLogoArtwork).toBe(logo);
+    expect(result.store?.footerArtwork).toBe(footer);
+    const restored = loadSavedStores();
+    expect(restored[0].storeLogoArtwork).toBe(logo);
+    expect(restored[0].footerArtwork).toBe(footer);
+  });
+
+  it('يحدّث الشعار والتذييل عند إعادة حفظ المتجر نفسه', () => {
+    saveSavedStore(profileWith({ storeName: 'أقل سعر' }), { storeLogoArtwork: 'data:image/webp;base64,OLD' });
+    const again = saveSavedStore(profileWith({ storeName: 'أقل سعر' }), { storeLogoArtwork: 'data:image/webp;base64,NEW', footerArtwork: 'data:image/webp;base64,F' });
+    expect(again.created).toBe(false);
+    const stores = loadSavedStores();
+    expect(stores).toHaveLength(1);
+    expect(stores[0].storeLogoArtwork).toBe('data:image/webp;base64,NEW');
+    expect(stores[0].footerArtwork).toBe('data:image/webp;base64,F');
+  });
+
+  it('يسجّل حقلاً فارغين عند الحفظ بلا شعار أو تذييل ليميّزها عن السجلات القديمة', () => {
+    const result = saveSavedStore(profileWith({ storeName: 'بلا هوية' }));
+    expect(result.store?.storeLogoArtwork).toBe('');
+    expect(result.store?.footerArtwork).toBe('');
+  });
+
+  it('يرفض قيم هوية ليست صوراً ويترك حقول السجلات القديمة الغائبة غائبة', () => {
+    const result = saveSavedStore(profileWith({ storeName: 'متجر' }), { storeLogoArtwork: 'https://example.com/logo.png' });
+    expect(result.store?.storeLogoArtwork).toBe('');
+
+    const legacy = [{ id: 'old-1', storeName: 'قديم', storePhone: '', deliveryPhone: '', storeLocation: '', storeCategory: '', storeCategories: [], defaultDiscount: '', defaultColors: [], updatedAt: 1 }];
+    localStorage.setItem(StorageKeys.SAVED_STORES, JSON.stringify(legacy));
+    const restored = loadSavedStores();
+    expect(restored[0].storeName).toBe('قديم');
+    expect(restored[0].storeLogoArtwork).toBeUndefined();
+    expect(restored[0].footerArtwork).toBeUndefined();
+  });
 });
