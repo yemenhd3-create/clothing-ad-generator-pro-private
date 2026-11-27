@@ -1,6 +1,7 @@
 import type { AdDetails, MarketingTextPreferences } from '@shared/types';
-import { CircleDollarSign, Package, Palette, Percent, Phone, Plus, Sparkles, Store, Tag, X } from 'lucide-react';
+import { CircleDollarSign, History, Package, Palette, Percent, Phone, Plus, Sparkles, Store, Tag, X } from 'lucide-react';
 import React, { useState } from 'react';
+import { getRememberedInputs, rememberInputValue, type RememberedField } from '@/lib/rememberedInputs';
 import { Input } from './ui/input';
 import MarketingTextComposer from './MarketingTextComposer';
 
@@ -18,9 +19,33 @@ function FieldLabel({ icon: Icon, title, note }: { icon: React.ComponentType<{ s
 
 export default function AdDetailsForm({ details, onChange, generateCloudText }: AdDetailsFormProps) {
   const [featureDraft, setFeatureDraft] = useState('');
+  const [memoryTick, setMemoryTick] = useState(0);
 
   const update = <K extends keyof AdDetails>(key: K, value: AdDetails[K]) => {
     onChange({ ...details, [key]: value });
+  };
+
+  const rememberOnBlur = (field: RememberedField, value: string) => {
+    if (!value.trim()) return;
+    rememberInputValue(field, value);
+    setMemoryTick(tick => tick + 1);
+  };
+
+  const rememberedChips = (field: RememberedField, current: string) => {
+    void memoryTick;
+    if (current.trim()) return null;
+    const values = getRememberedInputs(field).slice(0, 3);
+    if (!values.length) return null;
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid={`remembered-${field}`}>
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground"><History size={12} />آخر ما استخدمت:</span>
+        {values.map(value => (
+          <button key={value} type="button" onClick={() => update(field, value)} className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold text-primary transition active:scale-95">
+            {value}
+          </button>
+        ))}
+      </div>
+    );
   };
 
   const addFeature = () => {
@@ -41,20 +66,23 @@ export default function AdDetailsForm({ details, onChange, generateCloudText }: 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2">
             <FieldLabel icon={Tag} title="اسم المنتج" note="اختياري" />
-            <Input className={fieldClass} value={details.productName} onChange={event => update('productName', event.target.value)} placeholder="مثال: فستان بناتي" />
+            <Input className={fieldClass} value={details.productName} onChange={event => update('productName', event.target.value)} onBlur={() => rememberOnBlur('productName', details.productName)} placeholder="مثال: فستان بناتي" />
+            {rememberedChips('productName', details.productName)}
           </label>
 
           <label className="space-y-2">
             <FieldLabel icon={CircleDollarSign} title="السعر" note="اختياري" />
             <div className="flex gap-2">
-              <Input className={fieldClass} inputMode="decimal" value={details.price} onChange={event => update('price', event.target.value)} placeholder="5000" />
+              <Input className={fieldClass} inputMode="decimal" value={details.price} onChange={event => update('price', event.target.value)} onBlur={() => rememberOnBlur('price', details.price)} placeholder="5000" />
               <Input className={`${fieldClass} max-w-24 px-2 text-center`} value={details.currency} onChange={event => update('currency', event.target.value)} aria-label="العملة" />
             </div>
+            {rememberedChips('price', details.price)}
           </label>
 
           <label className="space-y-2">
             <FieldLabel icon={Percent} title="نسبة الخصم" note="اختياري" />
-            <div className="relative"><Input className={`${fieldClass} pl-10`} inputMode="numeric" value={details.discount} onChange={event => update('discount', event.target.value.replace(/[^0-9.]/g, ''))} placeholder="20" /><span className="pointer-events-none absolute inset-y-0 left-4 flex items-center font-bold text-muted-foreground">%</span></div>
+            <div className="relative"><Input className={`${fieldClass} pl-10`} inputMode="numeric" value={details.discount} onChange={event => update('discount', event.target.value.replace(/[^0-9.]/g, ''))} onBlur={() => rememberOnBlur('discount', details.discount)} placeholder="20" /><span className="pointer-events-none absolute inset-y-0 left-4 flex items-center font-bold text-muted-foreground">%</span></div>
+            {rememberedChips('discount', details.discount)}
           </label>
         </div>
       </section>
