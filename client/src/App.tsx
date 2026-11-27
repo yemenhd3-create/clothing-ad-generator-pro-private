@@ -5,6 +5,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
+const DeveloperConfirmVisualCheck = lazy(() => import('./components/DeveloperConfirmVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
 const AuthenticatedApplication = lazy(() => import('./components/AuthenticatedApplication'));
 const DeviceCompatibilityCheck = lazy(() => import('./pages/DeviceCompatibilityCheck'));
@@ -27,6 +28,9 @@ function Router() {
 function PersonalHome() {
   if (new URLSearchParams(window.location.search).get('developer') === '1') {
     return <Suspense fallback={<LoadingScreen text="جارٍ فتح لوحة المطور…" />}><DeveloperWorkspace onBack={() => { window.location.href = '/'; }} /></Suspense>;
+  }
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('developer-confirm-check')) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة التأكيد…" />}><DeveloperConfirmVisualCheck /></Suspense>;
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('canvas-visual-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة القالب…" />}><CanvasVisualCheck /></Suspense>;

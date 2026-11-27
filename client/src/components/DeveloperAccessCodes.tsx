@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Coins, Copy, KeyRound, RotateCcw, ShieldBan, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
+import ConfirmDestructiveModal from './ConfirmDestructiveModal';
 
 export default function DeveloperAccessCodes() {
   const utils = trpc.useUtils();
@@ -15,6 +16,7 @@ export default function DeveloperAccessCodes() {
   const [createdCode, setCreatedCode] = useState<string | null>(null);
 
   const [activeCodeId, setActiveCodeId] = useState<number | null>(null);
+  const [codePendingRevoke, setCodePendingRevoke] = useState<{ id: number; label: string | null } | null>(null);
   const [rechargeAmount, setRechargeAmount] = useState('100');
   const [editTotalCredits, setEditTotalCredits] = useState('500');
   const [editDailyLimit, setEditDailyLimit] = useState('50');
@@ -229,7 +231,7 @@ export default function DeveloperAccessCodes() {
                 <button
                   type="button"
                   disabled={revokeCode.isPending}
-                  onClick={() => revokeCode.mutate({ id: code.id })}
+                  onClick={() => setCodePendingRevoke({ id: code.id, label: code.label ?? null })}
                   className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700"
                 >
                   <ShieldBan size={14} />
@@ -350,5 +352,14 @@ export default function DeveloperAccessCodes() {
         );
       })}
     </div>
+    <ConfirmDestructiveModal
+      isOpen={codePendingRevoke !== null}
+      onClose={() => setCodePendingRevoke(null)}
+      onConfirm={() => { if (codePendingRevoke) revokeCode.mutate({ id: codePendingRevoke.id }); setCodePendingRevoke(null); }}
+      title="إلغاء رمز الدخول"
+      description={`سيُلغى الرمز «${codePendingRevoke?.label || 'بدون اسم'}» وتتوقف جلسته الحالية فوراً ولا يمكن التراجع. هل أنت متأكد؟`}
+      confirmLabel="إلغاء الرمز"
+      pending={revokeCode.isPending}
+    />
   </section>;
 }
