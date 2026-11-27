@@ -3,6 +3,7 @@ import { DEFAULT_PRODUCT_SCALE, PRODUCT_SCALE_MAX, PRODUCT_SCALE_MIN, type AdDet
 import { getArtworkTransform } from '@shared/artworkLayout';
 import { getDesignGeometry } from '@shared/designGeometry';
 import { getTemplateTheme, type TemplateThemePalette } from '@shared/templateThemes';
+import { sanitizeAdDetails, sanitizeTemplateText } from './canvasText';
 
 export interface RenderOptions {
   width?: number;
@@ -22,6 +23,9 @@ type Layout = { font: (weight: number, size: number) => string; width: number; h
 /** يرسم قالباً هندسياً مستقلاً لكل مقاس؛ الملابس دائماً أكبر منطقة بصرية. */
 export async function renderAd(details: AdDetails, template: TemplateSettings, productImageSrc: string, options: RenderOptions = {}): Promise<string> {
   await waitForCanvasFonts();
+  // نرسم نسخة نظيفة من نصوص المستخدم؛ الحقول المحفوظة تبقى كما كتبها
+  details = sanitizeAdDetails(details);
+  template = sanitizeTemplateText(template);
   const { width, height } = resolveCanvasSize(template.size, options.width, options.height);
   const canvas = document.createElement('canvas');
   canvas.width = width;
