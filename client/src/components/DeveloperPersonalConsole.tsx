@@ -2,6 +2,7 @@ import { Archive, BellRing, CheckCircle2, MessageSquareText, ShieldBan, UsersRou
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { trpc } from '@/lib/trpc';
+import ConfirmDestructiveModal from './ConfirmDestructiveModal';
 import DeveloperAccessCodes from './DeveloperAccessCodes';
 import DeveloperAiUsageLogs from './DeveloperAiUsageLogs';
 
@@ -15,6 +16,7 @@ export default function DeveloperPersonalConsole() {
   const [announcement, setAnnouncement] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [offlineGraceHours, setOfflineGraceHours] = useState(72);
+  const [userPendingDisable, setUserPendingDisable] = useState<{ id: number; name: string | null } | null>(null);
 
   useEffect(() => {
     const active = announcementsQuery.data?.find(item => item.isActive === 1) ?? announcementsQuery.data?.[0];
@@ -108,9 +110,19 @@ export default function DeveloperPersonalConsole() {
         <div className="mb-4 flex items-center gap-2 text-primary"><ShieldBan size={20} /><h3 className="font-black">الحسابات والصلاحية</h3></div>
         {!usersQuery.data?.length && <p className="rounded-2xl bg-secondary/70 p-4 text-sm text-muted-foreground">لم يسجل أي مستخدم بعد.</p>}
         <div className="space-y-3">
-          {usersQuery.data?.map(user => <article key={user.id} className="flex items-center justify-between gap-3 rounded-2xl border border-stone-100 p-4"><div className="min-w-0"><p className="truncate font-black text-foreground">{user.name || 'مستخدم بلا اسم'}</p><p className="mt-1 truncate text-xs text-muted-foreground" dir="ltr">{user.email || user.loginMethod || `ID ${user.id}`}</p><p className="mt-1 text-[11px] text-muted-foreground">آخر اتصال: {user.lastSeenAt ? new Date(user.lastSeenAt).toLocaleString() : 'لم يتصل بعد'}</p></div><button type="button" disabled={setUserAccess.isPending} onClick={() => setUserAccess.mutate({ id: user.id, isDisabled: user.isDisabled !== 1 })} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${user.isDisabled === 1 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{user.isDisabled === 1 ? 'إعادة تفعيل' : 'إيقاف الحساب'}</button></article>)}
+          {usersQuery.data?.map(user => <article key={user.id} className="flex items-center justify-between gap-3 rounded-2xl border border-stone-100 p-4"><div className="min-w-0"><p className="truncate font-black text-foreground">{user.name || 'مستخدم بلا اسم'}</p><p className="mt-1 truncate text-xs text-muted-foreground" dir="ltr">{user.email || user.loginMethod || `ID ${user.id}`}</p><p className="mt-1 text-[11px] text-muted-foreground">آخر اتصال: {user.lastSeenAt ? new Date(user.lastSeenAt).toLocaleString() : 'لم يتصل بعد'}</p></div><button type="button" disabled={setUserAccess.isPending} onClick={() => { if (user.isDisabled === 1) { setUserAccess.mutate({ id: user.id, isDisabled: false }); } else { setUserPendingDisable({ id: user.id, name: user.name }); } }} className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold ${user.isDisabled === 1 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{user.isDisabled === 1 ? 'إعادة تفعيل' : 'إيقاف الحساب'}</button></article>)}
         </div>
       </section>
+
+      <ConfirmDestructiveModal
+        isOpen={userPendingDisable !== null}
+        onClose={() => setUserPendingDisable(null)}
+        onConfirm={() => { if (userPendingDisable) setUserAccess.mutate({ id: userPendingDisable.id, isDisabled: true }); setUserPendingDisable(null); }}
+        title="إيقاف الحساب"
+        description={`سيُمنع حساب «${userPendingDisable?.name || 'مستخدم بلا اسم'}» من استخدام التطبيق فوراً حتى تعيد تفعيله. هل أنت متأكد؟`}
+        confirmLabel="إيقاف الحساب"
+        pending={setUserAccess.isPending}
+      />
     </section>
   );
 }

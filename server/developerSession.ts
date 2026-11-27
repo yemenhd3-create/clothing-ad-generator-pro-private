@@ -3,7 +3,8 @@ import { parse } from 'cookie';
 import type { Request } from 'express';
 
 export const DEVELOPER_SESSION_COOKIE = 'clothing_ad_developer_session';
-export const DEVELOPER_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
+/** جلسة المطور قصيرة عمداً: ساعة واحدة ثم انتهاء تلقائي يتطلب دخولاً جديداً. */
+export const DEVELOPER_SESSION_MAX_AGE_MS = 60 * 60 * 1000;
 
 function sessionSecret() {
   const secret = process.env.JWT_SECRET ?? '';
