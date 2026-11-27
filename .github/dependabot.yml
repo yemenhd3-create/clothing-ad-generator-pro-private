@@ -1,0 +1,24 @@
+# تحديثات Dependabot الأسبوعية:
+# - حزم npm/pnpm: التحديثات الصغيرة والترقيعية مجمعة في طلب واحد لتقليل الضجيج،
+#   والتحديثات الكبرى تصل منفصلة لأنها تحتاج مراجعة.
+# - إجراءات GitHub المستخدمة في سير العمل.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    open-pull-requests-limit: 3
