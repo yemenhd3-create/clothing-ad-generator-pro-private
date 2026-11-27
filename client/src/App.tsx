@@ -6,6 +6,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 
 const CanvasVisualCheck = lazy(() => import('./components/CanvasVisualCheck'));
 const DeveloperConfirmVisualCheck = lazy(() => import('./components/DeveloperConfirmVisualCheck'));
+const AdDetailsFormVisualCheck = lazy(() => import('./components/AdDetailsFormVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
 const AuthenticatedApplication = lazy(() => import('./components/AuthenticatedApplication'));
 const DeviceCompatibilityCheck = lazy(() => import('./pages/DeviceCompatibilityCheck'));
@@ -31,6 +32,9 @@ function PersonalHome() {
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('developer-confirm-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة التأكيد…" />}><DeveloperConfirmVisualCheck /></Suspense>;
+  }
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('ad-details-form-check')) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة النموذج…" />}><AdDetailsFormVisualCheck /></Suspense>;
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('canvas-visual-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة القالب…" />}><CanvasVisualCheck /></Suspense>;
