@@ -20,6 +20,7 @@ import ImageUploader from '@/components/ImageUploader';
 import { TryOnOptIn, type TryOnSelection } from '@/components/TryOnOptIn';
 import LocalDesignSuggestionCard from '@/components/LocalDesignSuggestionCard';
 import PwaInstallPrompt from '@/components/PwaInstallPrompt';
+import StepHelpHint from '@/components/StepHelpHint';
 import DesignPassportCard from '@/components/DesignPassportCard';
 import DesignContractCard from '@/components/DesignContractCard';
 import { renderAd } from '@/lib/canvasRenderer';
@@ -1281,7 +1282,10 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               );
             })}
           </div>
+          <StepHelpHint step={currentStep} />
         </section>}
+
+        {activeView === 'create' && !WARDROBE_ROOM_MODE && currentStep === 'upload' && <StepHelpHint step="upload" />}
 
         {activeView === 'settings' && (<React.Suspense fallback={<PageLoading label="جارٍ فتح الإعدادات…" />}><UserTemplateSettings
             settings={templateSettings}
