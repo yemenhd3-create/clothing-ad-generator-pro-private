@@ -63,6 +63,7 @@ import {
   MessageSquareText,
   Palette,
   Pencil,
+  PenLine,
   RotateCcw,
   Send,
   Settings,
@@ -86,6 +87,7 @@ const AboutApp = React.lazy(() => import('@/components/AboutApp'));
 const BatchWorkspace = React.lazy(() => import('@/components/BatchWorkspace'));
 const DeveloperWorkspace = React.lazy(() => import('@/components/DeveloperWorkspace'));
 const AdDetailsForm = React.lazy(() => import('@/components/AdDetailsForm'));
+const QuickMarketingCopyPanel = React.lazy(() => import('@/components/QuickMarketingCopyPanel'));
 const PersonalMessageCenter = React.lazy(() => import('@/components/PersonalMessageCenter'));
 const SharePanel = React.lazy(() => import('@/components/SharePanel'));
 const DesignQualityGateCard = React.lazy(() => import('@/components/DesignQualityGateCard'));
@@ -171,6 +173,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
   const studioRenderRequestRef = React.useRef(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isReviewingImage, setIsReviewingImage] = useState(false);
+  const [quickCopyMode, setQuickCopyMode] = useState(false);
   const [isRefinementStudioOpen, setIsRefinementStudioOpen] = useState(false);
   const [activeWardrobeTool, setActiveWardrobeTool] = useState<WardrobeTool>(null);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
@@ -372,11 +375,11 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setTryOnResult({ status: 'idle', message: '' });
     setDesignSuggestion(null);
     setTemplateBeforeSuggestion(null);
+    setQuickCopyMode(false);
     setCurrentStep('upload');
     if (WARDROBE_ROOM_MODE) {
-      setIsReviewingImage(false);
-      toast.success('تم رفع الصورة. نبدأ تفريغ الخلفية محلياً الآن.');
-      void generateAd(imageUrl);
+      setIsReviewingImage(true);
+      toast.success('تمت إضافة الصورة. اختر طريقة المتابعة.');
       return;
     }
     setIsReviewingImage(true);
@@ -401,6 +404,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setDesignSuggestion(null);
     setTemplateBeforeSuggestion(null);
     setIsReviewingImage(false);
+    setQuickCopyMode(false);
     setCurrentStep('upload');
   };
 
@@ -442,6 +446,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
     setLastVisualSource('');
     setMarketingText('');
     setIsReviewingImage(false);
+    setQuickCopyMode(false);
     resetDraftFields();
     setTryOnResult({ status: 'idle', message: '' });
     setDesignSuggestion(null);
@@ -791,6 +796,37 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
       return result;
     } catch {
       return { ...local, source: 'local-fallback' as const, message: 'تعذر الاتصال، فاستخدمنا المولد المحلي فوراً.' };
+    }
+  };
+
+  const generateQuickCopyText = async (variant: number) => {
+    const preferences = resolveMarketingTextPreferences({ ...DEFAULT_MARKETING_TEXT_PREFERENCES, ...merchantProfile.marketingPreferences });
+    const result = await generateWardrobeMarketingText(adDetails, preferences, variant);
+    if (result.message) toast.message(result.message);
+    else if (result.source === 'cloud') toast.success('حسّنا النص بأفضل نموذج متاح.');
+  };
+
+  const handleQuickWhatsApp = async () => {
+    if (!productImage) return;
+    try {
+      const textToShare = getWardrobeShareText('whatsapp', marketingText);
+      if (textToShare && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(textToShare);
+        } catch {
+          // silent fallback for clipboard
+        }
+      }
+      const shared = await shareViaWebAPI(productImage, adDetails.productName || 'صورة المنتج', textToShare);
+      if (shared) {
+        toast.success('تم فتح نافذة المشاركة، ونُسخ النص للحافظة! إذا لم يظهر كتعليق في متصفحك، الصقه مباشرة.');
+        return;
+      }
+      downloadImage(productImage, `${adDetails.productName.trim() || 'صورة-المنتج'}-${Date.now()}.png`);
+      shareToWhatsApp('', textToShare);
+      toast.success('حُفظت الصورة ونُسخ النص للحافظة وفتح واتساب. أرفق الصورة من التنزيلات.');
+    } catch {
+      toast.error('تعذّرت المشاركة عبر واتساب. جرّب تنزيل الصورة أولاً.');
     }
   };
 
@@ -1368,7 +1404,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
             </div>}
             {isReviewingImage && productImage ? (
               <div className={WARDROBE_ROOM_MODE ? 'flex flex-1 flex-col justify-center space-y-4' : 'space-y-4'}>
-                <SingleImageReview simple={WARDROBE_ROOM_MODE} image={productImage} suggestion={designSuggestion} comparisonPreviews={comparisonPreviews} isDesignAnalyzing={isDesignAnalyzing} localPreparation={localPreparation} benchmarks={designBenchmarks} regression={designRegression} selectedSize={selectedSuggestedSize} currentSize={templateSettings.size} preferenceEnabled={preferenceProfile.enabled} accepted={Boolean(templateBeforeSuggestion)} onSelectSize={setSelectedSuggestedSize} onAcceptSuggestion={acceptDesignSuggestion} onIgnoreSuggestion={ignoreDesignSuggestion} onUndoSuggestion={undoDesignSuggestion} onTogglePreferences={() => setPreferenceProfile(current => setPreferenceEnabled(current, !current.enabled))} onClearPreferences={() => { setPreferenceProfile(clearPreferenceProfile()); toast.success('تم مسح تفضيلات المصمم من هذا الهاتف.'); }} onImageSelect={handleImageSelect} onImageRemove={handleImageRemove} onContinue={() => { setIsReviewingImage(false); if (WARDROBE_ROOM_MODE) void generateAd(); else { setCurrentStep('details'); toast.success('الصورة جاهزة. أضف بيانات الإعلان التي تريدها.'); } }} />
+                <SingleImageReview simple={WARDROBE_ROOM_MODE} image={productImage} suggestion={designSuggestion} comparisonPreviews={comparisonPreviews} isDesignAnalyzing={isDesignAnalyzing} localPreparation={localPreparation} benchmarks={designBenchmarks} regression={designRegression} selectedSize={selectedSuggestedSize} currentSize={templateSettings.size} preferenceEnabled={preferenceProfile.enabled} accepted={Boolean(templateBeforeSuggestion)} onSelectSize={setSelectedSuggestedSize} onAcceptSuggestion={acceptDesignSuggestion} onIgnoreSuggestion={ignoreDesignSuggestion} onUndoSuggestion={undoDesignSuggestion} onTogglePreferences={() => setPreferenceProfile(current => setPreferenceEnabled(current, !current.enabled))} onClearPreferences={() => { setPreferenceProfile(clearPreferenceProfile()); toast.success('تم مسح تفضيلات المصمم من هذا الهاتف.'); }} onImageSelect={handleImageSelect} onImageRemove={handleImageRemove} onContinue={() => { setQuickCopyMode(false); setIsReviewingImage(false); if (WARDROBE_ROOM_MODE) void generateAd(); else { setCurrentStep('details'); toast.success('الصورة جاهزة. أضف بيانات الإعلان التي تريدها.'); } }} onQuickCopy={() => { setIsReviewingImage(false); setQuickCopyMode(true); setCurrentStep('details'); toast.success('اكتب اسم المنتج فقط إن أردت، ثم اضغط زر النص.'); }} />
                 {!WARDROBE_ROOM_MODE && !friendTestMode && <TryOnOptIn isRunning={isTryOnRunning} preview={tryOnPreview} onRequest={handleTryOnRequest} onCancel={handleTryOnCancel} onAcceptPreview={handleTryOnAccept} onRejectPreview={handleTryOnReject} />}
               </div>
             ) : (
@@ -1389,8 +1425,8 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               <img src={productImage} alt="صورة القطعة المختارة" className="h-16 w-16 rounded-xl object-cover" />
               <div className="min-w-0 flex-1">
                 <span className="text-xs font-bold text-primary">الصورة جاهزة</span>
-                <h2 className="mt-1 text-xl font-black text-foreground">بيانات الإعلان</h2>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">يكفي اسم المنتج والسعر إن وجدا. أضف تفاصيل أكثر فقط إذا احتجت.</p>
+                <h2 className="mt-1 text-xl font-black text-foreground">{quickCopyMode ? 'نص تسويقي سريع' : 'بيانات الإعلان'}</h2>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{quickCopyMode ? 'بدون تفريغ خلفية وبدون تصميم. يكفي اسم المنتج، واضغط زر النص.' : 'يكفي اسم المنتج والسعر إن وجدا. أضف تفاصيل أكثر فقط إذا احتجت.'}</p>
               </div>
               <button
                 type="button"
@@ -1401,17 +1437,33 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
               </button>
             </div>
 
-            <React.Suspense fallback={<PageLoading label="جارٍ تجهيز حقول الإعلان…" />}><AdDetailsForm details={adDetails} onChange={setAdDetails} generateCloudText={friendTestMode ? undefined : (details, preferences, variant) => marketingTextMutation.mutateAsync({ details, preferences, variant })} /></React.Suspense>
+            {quickCopyMode ? (
+              <React.Suspense fallback={<PageLoading label="جارٍ تجهيز كاتب النص…" />}>
+                <QuickMarketingCopyPanel
+                  details={adDetails}
+                  onChange={handleMarketingDetailsChange}
+                  onGenerate={variant => void generateQuickCopyText(variant)}
+                  isGenerating={marketingTextMutation.isPending}
+                  onCopy={() => void handleCopyMarketingText()}
+                  onShareWhatsApp={() => void handleQuickWhatsApp()}
+                  onSwitchToFull={() => { setQuickCopyMode(false); toast.success('عدنا لمسار التصميم الكامل. أكمل بيانات الإعلان ثم أنشئه.'); }}
+                />
+              </React.Suspense>
+            ) : (
+              <>
+                <React.Suspense fallback={<PageLoading label="جارٍ تجهيز حقول الإعلان…" />}><AdDetailsForm details={adDetails} onChange={setAdDetails} generateCloudText={friendTestMode ? undefined : (details, preferences, variant) => marketingTextMutation.mutateAsync({ details, preferences, variant })} /></React.Suspense>
 
-            <div className="reference-local-note mt-5"><BadgeCheck size={18} />سيجهّز التطبيق الخلفية والنص تلقائياً على الهاتف.</div>
+                <div className="reference-local-note mt-5"><BadgeCheck size={18} />سيجهّز التطبيق الخلفية والنص تلقائياً على الهاتف.</div>
 
-            <button
-              type="button"
-              onClick={() => void generateAd()}
-              className="reference-primary mt-5 w-full"
-            >
-              <Sparkles size={20} /> إنشاء الإعلان
-            </button>
+                <button
+                  type="button"
+                  onClick={() => void generateAd()}
+                  className="reference-primary mt-5 w-full"
+                >
+                  <Sparkles size={20} /> إنشاء الإعلان
+                </button>
+              </>
+            )}
           </section>
         )}
 
@@ -1993,7 +2045,7 @@ function clampProductScale(value?: number) {
   return Math.min(PRODUCT_SCALE_MAX, Math.max(PRODUCT_SCALE_MIN, Number(stepped.toFixed(2))));
 }
 
-function SingleImageReview({ simple = false, image, suggestion, comparisonPreviews, isDesignAnalyzing, localPreparation, benchmarks, regression, selectedSize, currentSize, preferenceEnabled, accepted, onSelectSize, onAcceptSuggestion, onIgnoreSuggestion, onUndoSuggestion, onTogglePreferences, onClearPreferences, onImageSelect, onImageRemove, onContinue }: { simple?: boolean; image: string; suggestion: DesignSuggestion | null; comparisonPreviews: { current: string; suggested: string } | null; isDesignAnalyzing: boolean; localPreparation: { status: 'idle' | 'analyzing' | 'ready' | 'failed'; cache?: 'hit' | 'miss'; elapsedMs?: number }; benchmarks: DesignBenchmark[]; regression: DesignRegression | null; selectedSize: TemplateSize; currentSize: TemplateSize; preferenceEnabled: boolean; accepted: boolean; onSelectSize: (size: TemplateSize) => void; onAcceptSuggestion: () => void; onIgnoreSuggestion: () => void; onUndoSuggestion: () => void; onTogglePreferences: () => void; onClearPreferences: () => void; onImageSelect: (imageUrl: string) => void; onImageRemove: () => void; onContinue: () => void }) {
+function SingleImageReview({ simple = false, image, suggestion, comparisonPreviews, isDesignAnalyzing, localPreparation, benchmarks, regression, selectedSize, currentSize, preferenceEnabled, accepted, onSelectSize, onAcceptSuggestion, onIgnoreSuggestion, onUndoSuggestion, onTogglePreferences, onClearPreferences, onImageSelect, onImageRemove, onContinue, onQuickCopy }: { simple?: boolean; image: string; suggestion: DesignSuggestion | null; comparisonPreviews: { current: string; suggested: string } | null; isDesignAnalyzing: boolean; localPreparation: { status: 'idle' | 'analyzing' | 'ready' | 'failed'; cache?: 'hit' | 'miss'; elapsedMs?: number }; benchmarks: DesignBenchmark[]; regression: DesignRegression | null; selectedSize: TemplateSize; currentSize: TemplateSize; preferenceEnabled: boolean; accepted: boolean; onSelectSize: (size: TemplateSize) => void; onAcceptSuggestion: () => void; onIgnoreSuggestion: () => void; onUndoSuggestion: () => void; onTogglePreferences: () => void; onClearPreferences: () => void; onImageSelect: (imageUrl: string) => void; onImageRemove: () => void; onContinue: () => void; onQuickCopy?: () => void }) {
   return <div className="space-y-5">
     <div className="rounded-2xl border border-primary/10 bg-primary/[0.045] p-4">
       <div className="flex items-start gap-3"><BadgeCheck size={20} className="mt-0.5 shrink-0 text-primary" /><div><h3 className="text-sm font-black text-primary">{simple ? 'القطعة جاهزة للاستديو' : 'راجع الصورة قبل المتابعة'}</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">{simple ? 'يمكنك تنقيح الحواف محلياً عند الحاجة، ثم أنشئ صورة الاستديو مباشرة.' : 'تأكد أن قطعة الملابس واضحة. يمكنك تغيير الصورة أو حذفها والعودة للرفع.'}</p></div></div>
@@ -2005,6 +2057,7 @@ function SingleImageReview({ simple = false, image, suggestion, comparisonPrevie
     {!simple && localPreparation.status === 'failed' && <div className="rounded-xl bg-primary/[.05] px-3 py-2 text-center text-xs font-bold text-primary">تعذر التحليل المسبق؛ يمكنك متابعة إنشاء الإعلان محلياً كالمعتاد.</div>}
     {!simple && suggestion && <LocalDesignSuggestionCard suggestion={suggestion} selectedSize={selectedSize} currentSize={currentSize} onSelectSize={onSelectSize} onAccept={onAcceptSuggestion} onIgnore={onIgnoreSuggestion} onUndo={onUndoSuggestion} accepted={accepted} preferencesEnabled={preferenceEnabled} onTogglePreferences={onTogglePreferences} onClearPreferences={onClearPreferences} comparisonPreviews={comparisonPreviews} benchmarks={benchmarks} regression={regression} />}
     <button type="button" onClick={onContinue} className="reference-primary w-full"><Sparkles size={20} />{simple ? 'إنشاء صورة الاستديو' : 'متابعة إلى بيانات الإعلان'}</button>
+    {onQuickCopy && <button type="button" onClick={onQuickCopy} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary/20 bg-white px-4 text-sm font-black text-primary transition active:scale-[.98]"><PenLine size={18} />صورتي جاهزة — أريد نصاً تسويقياً فقط</button>}
   </div>;
 }
 
