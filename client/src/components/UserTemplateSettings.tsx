@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   CircleHelp,
   Contrast,
+  Database,
   ImagePlus,
   LayoutTemplate,
   MonitorSmartphone,
@@ -29,9 +30,11 @@ import {
   X,
 } from 'lucide-react';
 import * as React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useOptionalTheme } from '@/contexts/ThemeContext';
 import { applyHighContrast, loadHighContrast } from '@/lib/highContrast';
+import { DEVICE_DATA_CATEGORIES, clearAllBatchDrafts, clearDynamicTemplateCache, clearRememberedInputs, clearSmartMarketingMemory, formatBytes, getDeviceStorageEstimate, type DeviceDataCategory, type DeviceStorageEstimate } from '@/lib/dataPrivacy';
+import ConfirmDestructiveModal from './ConfirmDestructiveModal';
 import { PRACTICAL_HEADER_RATIO } from '@/lib/brandArtworkSupport';
 import type { LocalToolSetupState } from '@/lib/localRemovalSetup';
 import ArtworkPositionEditor from './ArtworkPositionEditor';
@@ -52,7 +55,7 @@ interface UserTemplateSettingsProps {
 
 type SettingsSection = 'all' | 'store' | 'appearance' | 'system';
 type ToggleKey = 'showProductName' | 'showHeadline' | 'showDiscount' | 'showQuantity' | 'showColors' | 'showFeatures' | 'showPrice' | 'showStoreInfo' | 'showQualityMark';
-type SettingsCardKey = 'size' | 'theme' | 'studio' | 'identity' | 'badges' | 'elements' | 'help' | 'display';
+type SettingsCardKey = 'size' | 'theme' | 'studio' | 'identity' | 'badges' | 'elements' | 'help' | 'display' | 'data';
 
 const toggles: Array<{ key: ToggleKey; title: string; description: string }> = [
   { key: 'showProductName', title: 'اسم المنتج', description: 'يظهر في أعلى القالب.' },
@@ -189,6 +192,32 @@ export default function UserTemplateSettings({
   const [newCatInput, setNewCatInput] = useState('');
   const [showCatInput, setShowCatInput] = useState(false);
   const [highContrast, setHighContrast] = useState(loadHighContrast);
+  const [storageEstimate, setStorageEstimate] = useState<DeviceStorageEstimate>(null);
+  const [clearingCategory, setClearingCategory] = useState<DeviceDataCategory | null>(null);
+  const [clearingPending, setClearingPending] = useState(false);
+  const [clearedCategories, setClearedCategories] = useState<Partial<Record<DeviceDataCategory, boolean>>>({});
+  useEffect(() => {
+    let active = true;
+    getDeviceStorageEstimate().then(estimate => { if (active) setStorageEstimate(estimate); });
+    return () => { active = false; };
+  }, []);
+
+  const confirmClearCategory = async () => {
+    if (!clearingCategory) return;
+    setClearingPending(true);
+    try {
+      if (clearingCategory === 'rememberedInputs') clearRememberedInputs();
+      else if (clearingCategory === 'smartMemory') clearSmartMarketingMemory();
+      else if (clearingCategory === 'dynamicTemplates') clearDynamicTemplateCache();
+      else await clearAllBatchDrafts();
+      setClearedCategories(current => ({ ...current, [clearingCategory]: true }));
+      toast.success(`تم مسح ${DEVICE_DATA_CATEGORIES[clearingCategory].title} من هذا الجهاز.`);
+      getDeviceStorageEstimate().then(setStorageEstimate);
+    } finally {
+      setClearingPending(false);
+      setClearingCategory(null);
+    }
+  };
 
   const visibleCount = toggles.filter(item => settings[item.key]).length;
   const selectedBadges = settings.badgeTypes?.slice() || (settings.badgeType !== 'none' ? [settings.badgeType] : []);
@@ -324,7 +353,7 @@ export default function UserTemplateSettings({
     if (sectionFilter === 'all') return true;
     if (sectionFilter === 'store') return cardKey === 'identity';
     if (sectionFilter === 'appearance') return ['size', 'theme', 'studio', 'badges', 'elements', 'display'].includes(cardKey);
-    if (sectionFilter === 'system') return cardKey === 'help';
+    if (sectionFilter === 'system') return cardKey === 'help' || cardKey === 'data';
     return true;
   };
 
@@ -857,6 +886,44 @@ export default function UserTemplateSettings({
         </SettingsCard>
       )}
 
+      {/* بطاقة بيانات الجهاز والمسح */}
+      {shouldShow('data') && (
+        <SettingsCard
+          id="data"
+          icon={Database}
+          title="بيانات الجهاز والمسح"
+          summary="مساحة التخزين ومسح البيانات المحفوظة على هذا الجهاز"
+          open={openCard === 'data'}
+          onToggle={() => setCard('data')}
+        >
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">كل بيانات التطبيق محفوظة على جهازك فقط. يمكنك مسح أي فئة من هنا بعد تأكيدك، ولن يُحذف شيء تلقائياً.</p>
+          {storageEstimate && storageEstimate.usageBytes !== null && (
+            <div className="mb-3 rounded-2xl border border-primary/10 bg-white p-3 text-xs font-bold text-muted-foreground">
+              المساحة المستخدمة على هذا الجهاز: <span className="font-black text-primary">{formatBytes(storageEstimate.usageBytes)}</span>
+              {storageEstimate.quotaBytes !== null && <span> من {formatBytes(storageEstimate.quotaBytes)}</span>}
+            </div>
+          )}
+          <div className="space-y-2">
+            {(Object.keys(DEVICE_DATA_CATEGORIES) as DeviceDataCategory[]).map(category => (
+              <div key={category} className="flex items-center justify-between gap-3 rounded-2xl border border-primary/10 bg-white p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-foreground">{DEVICE_DATA_CATEGORIES[category].title}</p>
+                  <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{DEVICE_DATA_CATEGORIES[category].description}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={clearedCategories[category]}
+                  onClick={() => setClearingCategory(category)}
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-700 transition active:scale-95 disabled:opacity-40"
+                >
+                  {clearedCategories[category] ? 'تم المسح' : 'مسح'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </SettingsCard>
+      )}
+
       {/* بطاقة المساعدة والتطبيق */}
       {shouldShow('help') && (
         <SettingsCard
@@ -980,6 +1047,16 @@ export default function UserTemplateSettings({
       {pendingArtwork && (
         <ArtworkCropEditor kind={pendingArtwork.kind} source={pendingArtwork.source} onSave={saveArtwork} onCancel={() => setPendingArtwork(null)} />
       )}
+
+      <ConfirmDestructiveModal
+        isOpen={clearingCategory !== null}
+        title={clearingCategory ? `مسح ${DEVICE_DATA_CATEGORIES[clearingCategory].title}` : ''}
+        description={clearingCategory ? `سيُحذف ما يلي من هذا الجهاز نهائياً: ${DEVICE_DATA_CATEGORIES[clearingCategory].description} لا يمكن التراجع بعد المسح.` : ''}
+        confirmLabel="نعم، امسح"
+        pending={clearingPending}
+        onConfirm={confirmClearCategory}
+        onClose={() => setClearingCategory(null)}
+      />
     </section>
   );
 }
