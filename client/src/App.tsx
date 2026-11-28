@@ -9,6 +9,7 @@ const DeveloperConfirmVisualCheck = lazy(() => import('./components/DeveloperCon
 const LoginGateToggleVisualCheck = lazy(() => import('./components/LoginGateToggleVisualCheck'));
 const QuickCopyVisualCheck = lazy(() => import('./components/QuickCopyVisualCheck'));
 const MarketingToolVisualCheck = lazy(() => import('./components/MarketingToolVisualCheck'));
+const HighContrastVisualCheck = lazy(() => import('./components/HighContrastVisualCheck'));
 const AdDetailsFormVisualCheck = lazy(() => import('./components/AdDetailsFormVisualCheck'));
 const SharePanelVisualCheck = lazy(() => import('./components/SharePanelVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
@@ -45,6 +46,9 @@ function PersonalHome() {
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('marketing-tool-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة أداة النص…" />}><MarketingToolVisualCheck /></Suspense>;
+  }
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('high-contrast-check')) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة التباين…" />}><HighContrastVisualCheck /></Suspense>;
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('ad-details-form-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة النموذج…" />}><AdDetailsFormVisualCheck /></Suspense>;

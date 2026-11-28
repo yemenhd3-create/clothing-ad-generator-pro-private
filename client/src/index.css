@@ -328,3 +328,18 @@
     @apply text-xl;
   }
 }
+
+/* ========== وضع التباين المرتفع ==========
+   Tailwind v4 @theme inline يضمّن القيم داخل الأدوات، لذلك نتجاوزها بقواعد مباشرة. */
+.high-contrast .text-muted-foreground,
+.high-contrast .placeholder\:text-muted-foreground::placeholder {
+  color: oklch(0.34 0.03 285);
+}
+.dark.high-contrast .text-muted-foreground,
+.dark.high-contrast .placeholder\:text-muted-foreground::placeholder {
+  color: oklch(0.93 0.01 285);
+}
+.high-contrast .border-\[\#e8e4ed\],
+.high-contrast .border-\[\#e9e5ef\] {
+  border-color: oklch(0.6 0.02 90);
+}
