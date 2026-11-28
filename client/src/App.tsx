@@ -10,6 +10,7 @@ const LoginGateToggleVisualCheck = lazy(() => import('./components/LoginGateTogg
 const QuickCopyVisualCheck = lazy(() => import('./components/QuickCopyVisualCheck'));
 const MarketingToolVisualCheck = lazy(() => import('./components/MarketingToolVisualCheck'));
 const HighContrastVisualCheck = lazy(() => import('./components/HighContrastVisualCheck'));
+const DataPrivacyVisualCheck = lazy(() => import('./components/DataPrivacyVisualCheck'));
 const AdDetailsFormVisualCheck = lazy(() => import('./components/AdDetailsFormVisualCheck'));
 const SharePanelVisualCheck = lazy(() => import('./components/SharePanelVisualCheck'));
 const PersonalAccessGate = lazy(() => import('./components/PersonalAccessGate'));
@@ -49,6 +50,9 @@ function PersonalHome() {
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('high-contrast-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة التباين…" />}><HighContrastVisualCheck /></Suspense>;
+  }
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('data-privacy-check')) {
+    return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة البيانات…" />}><DataPrivacyVisualCheck /></Suspense>;
   }
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('ad-details-form-check')) {
     return <Suspense fallback={<LoadingScreen text="جارٍ تجهيز معاينة النموذج…" />}><AdDetailsFormVisualCheck /></Suspense>;
