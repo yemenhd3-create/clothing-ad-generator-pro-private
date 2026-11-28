@@ -1415,6 +1415,7 @@ export default function Home({ friendTestMode = false }: { friendTestMode?: bool
                   currentImage={productImage}
                   onImageRemove={handleImageRemove}
                 />
+                <p className="mt-3 text-center text-[11px] leading-5 text-muted-foreground">ارفع فقط صوراً تملك حق استخدامها. الصور تُعالج على جهازك ولا تُنشر دون إذنك.</p>
               </div>
             )}
           </section>

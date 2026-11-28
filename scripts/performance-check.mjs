@@ -31,7 +31,7 @@ const budgets = {
   mainJavaScript: 180 * 1024,
   initialJavaScript: 750 * 1024,
   deferredJavaScript: 45 * 1024,
-  css: 135 * 1024,
+  css: 140 * 1024, // رُفع السقف بعد إضافة قواعد وضع التباين المرتفع
 };
 
 const violations = [

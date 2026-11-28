@@ -7,7 +7,11 @@ import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
 import { isNativeApp } from "@/lib/nativeApp";
+import { applyHighContrast, loadHighContrast } from "@/lib/highContrast";
 import "./index.css";
+
+// تطبيق وضع التباين المرتفع المحفوظ قبل أول رسم حتى لا تومض الشاشة
+applyHighContrast(loadHighContrast());
 
 const queryClient = new QueryClient();
 

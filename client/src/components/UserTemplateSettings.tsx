@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleHelp,
+  Contrast,
   ImagePlus,
   LayoutTemplate,
   MonitorSmartphone,
@@ -30,6 +31,7 @@ import {
 import * as React from 'react';
 import { useState } from 'react';
 import { useOptionalTheme } from '@/contexts/ThemeContext';
+import { applyHighContrast, loadHighContrast } from '@/lib/highContrast';
 import { PRACTICAL_HEADER_RATIO } from '@/lib/brandArtworkSupport';
 import type { LocalToolSetupState } from '@/lib/localRemovalSetup';
 import ArtworkPositionEditor from './ArtworkPositionEditor';
@@ -50,7 +52,7 @@ interface UserTemplateSettingsProps {
 
 type SettingsSection = 'all' | 'store' | 'appearance' | 'system';
 type ToggleKey = 'showProductName' | 'showHeadline' | 'showDiscount' | 'showQuantity' | 'showColors' | 'showFeatures' | 'showPrice' | 'showStoreInfo' | 'showQualityMark';
-type SettingsCardKey = 'size' | 'theme' | 'studio' | 'identity' | 'badges' | 'elements' | 'help';
+type SettingsCardKey = 'size' | 'theme' | 'studio' | 'identity' | 'badges' | 'elements' | 'help' | 'display';
 
 const toggles: Array<{ key: ToggleKey; title: string; description: string }> = [
   { key: 'showProductName', title: 'اسم المنتج', description: 'يظهر في أعلى القالب.' },
@@ -186,6 +188,7 @@ export default function UserTemplateSettings({
   const [pendingArtwork, setPendingArtwork] = useState<{ kind: 'logo' | 'footer'; source: string } | null>(null);
   const [newCatInput, setNewCatInput] = useState('');
   const [showCatInput, setShowCatInput] = useState(false);
+  const [highContrast, setHighContrast] = useState(loadHighContrast);
 
   const visibleCount = toggles.filter(item => settings[item.key]).length;
   const selectedBadges = settings.badgeTypes?.slice() || (settings.badgeType !== 'none' ? [settings.badgeType] : []);
@@ -320,7 +323,7 @@ export default function UserTemplateSettings({
   const shouldShow = (cardKey: SettingsCardKey) => {
     if (sectionFilter === 'all') return true;
     if (sectionFilter === 'store') return cardKey === 'identity';
-    if (sectionFilter === 'appearance') return ['size', 'theme', 'studio', 'badges', 'elements'].includes(cardKey);
+    if (sectionFilter === 'appearance') return ['size', 'theme', 'studio', 'badges', 'elements', 'display'].includes(cardKey);
     if (sectionFilter === 'system') return cardKey === 'help';
     return true;
   };
@@ -720,6 +723,32 @@ export default function UserTemplateSettings({
                 </button>
               );
             })}
+          </div>
+        </SettingsCard>
+      )}
+
+      {/* بطاقة وضوح الشاشة (التباين المرتفع) */}
+      {shouldShow('display') && (
+        <SettingsCard
+          id="display"
+          icon={Contrast}
+          title="شاشة أوضح"
+          summary={highContrast ? 'التباين المرتفع مفعّل' : 'تباين عادي'}
+          open={openCard === 'display'}
+          onToggle={() => setCard('display')}
+        >
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">وضع التباين المرتفع يجعل النصوص الخافتة والحدود أغمق وأوضح، ويناسب الشاشات الضعيفة أو الاستخدام تحت الشمس. يُحفظ على هذا الجهاز فقط ولا يغيّر تصميم إعلاناتك.</p>
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/10 bg-white p-3">
+            <span className="text-xs font-black text-foreground">التباين المرتفع</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={highContrast}
+              onClick={() => { const next = !highContrast; applyHighContrast(next); setHighContrast(next); toast.success(next ? 'فُعّل التباين المرتفع.' : 'عاد التباين إلى الوضع العادي.'); }}
+              className={`shrink-0 rounded-xl px-4 py-3 text-sm font-black transition active:scale-95 ${highContrast ? 'bg-primary text-primary-foreground' : 'bg-secondary text-primary'}`}
+            >
+              {highContrast ? 'مفعّل' : 'متوقف'}
+            </button>
           </div>
         </SettingsCard>
       )}
